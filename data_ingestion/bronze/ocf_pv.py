@@ -22,7 +22,6 @@ def _flush_ocf(key: tuple[int, int], rows: list) -> None:
     df.to_parquet(out_path, index=False, compression="snappy")
     logger.success(f"wrote {len(df):,} row -> {out_path}")
 
-
 def _process_ocf_chunk(chunk: list, buffers: dict[tuple[int, int], list]) -> None:
     df = pd.DataFrame(chunk)
     df["_ts"] = pd.to_datetime(df["datetime_GMT"], utc=True, errors="coerce")
@@ -32,7 +31,6 @@ def _process_ocf_chunk(chunk: list, buffers: dict[tuple[int, int], list]) -> Non
         key = (int(yr), int(mo))
         rows = grp.drop(columns=["_ts", "_year", "_month"]).to_dict("records")
         buffers.setdefault(key, []).extend(rows)
-
 
 def ingest_ocf(years: list[int]) -> None:
     try:

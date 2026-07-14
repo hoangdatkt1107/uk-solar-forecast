@@ -16,3 +16,12 @@ base/
 notebooks/
 test/
 data/
+
+# deploy
+deploy/scripts/config.env
+deploy/_local_data/
+*.log
+
+docs/
+# macOS
+.DS_Store

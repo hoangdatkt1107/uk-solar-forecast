@@ -1,5 +1,4 @@
-"""Gold feature-store package.
-
+"""
 Run as a module:  python -m data_ingestion.gold --horizon-steps 48
 """
 from .merge import merge_silver

@@ -1,7 +1,6 @@
 from __future__ import annotations
 import sys
 from pathlib import Path
-
 import pandas as pd
 from loguru import logger
 
@@ -13,6 +12,10 @@ from ..silver.common import SILVER_LOCAL_DIR, read_silver
 
 GOLD_LOCAL_DIR = settings.data_dir / "gold"
 GOLD_TABLE = "gold_features"
+
+def gold_table(horizon: int) -> str:
+    """Per-horizon table name so different horizons coexist (24 steps -> _12h)."""
+    return f"gold_features_{horizon // 2}h"
 hf_token = settings.hf_token
 GOLD_HF_REPO = (getattr(settings, "gold_hf_repo", None)
                 or settings.bronze_hf_repo.replace("bronze", "gold"))
@@ -20,7 +23,6 @@ GOLD_HF_REPO = (getattr(settings, "gold_hf_repo", None)
 TS = "timestamp_utc"
 
 UK_LAT, UK_LON = 54.0, -2.5
-
 
 def write_gold(df: pd.DataFrame, table: str = GOLD_TABLE) -> int:
     """Write the Gold table partitioned by year=YYYY/month=MM (clean rebuild)."""
@@ -40,7 +42,6 @@ def write_gold(df: pd.DataFrame, table: str = GOLD_TABLE) -> int:
         written += len(part)
     logger.success(f"{table}: wrote {written:,} rows x {df.shape[1]} cols -> {GOLD_LOCAL_DIR / table}")
     return written
-
 
 def read_gold(table: str = GOLD_TABLE) -> pd.DataFrame:
     files = sorted((GOLD_LOCAL_DIR / table).rglob("*.parquet"))

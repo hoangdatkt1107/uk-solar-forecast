@@ -43,6 +43,7 @@ mdurl==0.1.2
 multidict==6.7.1
 multiprocess==0.70.19
 nest-asyncio==1.6.0
+netCDF4==1.7.4
 numcodecs==0.16.5
 numpy==2.4.6
 packaging==26.2

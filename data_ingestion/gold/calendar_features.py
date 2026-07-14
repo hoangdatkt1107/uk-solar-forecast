@@ -1,9 +1,7 @@
 from __future__ import annotations
 import numpy as np
 import pandas as pd
-
 from .common import TS, UK_LAT, UK_LON
-
 
 def add_calendar(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
@@ -22,7 +20,6 @@ def add_calendar(df: pd.DataFrame) -> pd.DataFrame:
     df["doy_sin"] = np.sin(2 * np.pi * doy / 365.25).astype("float32")
     df["doy_cos"] = np.cos(2 * np.pi * doy / 365.25).astype("float32")
     return df
-
 
 def solar_position(index: pd.DatetimeIndex, lat: float, lon: float):
     """NOAA solar position -> (elevation_deg, cos_zenith>=0). Vectorised."""

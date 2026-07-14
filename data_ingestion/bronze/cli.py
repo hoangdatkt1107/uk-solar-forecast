@@ -9,6 +9,7 @@ from loguru import logger
 from .pv_live import ingest_pv_live
 from .ocf_pv import ingest_ocf
 from .met_office import ingest_met_office_nwp, mirror_met_office_nwp_raw
+from .met_office_aws import ingest_met_office_aws
 from .neso import ingest_neso
 from .upload import upload_to_hf
 
@@ -18,7 +19,7 @@ def main() -> None:
     p.add_argument(
         "--source",
         required=True,
-        choices=["ocf_pv", "pv_live", "met_office_nwp", "neso", "all"],
+        choices=["ocf_pv", "pv_live", "met_office_nwp", "met_office_aws", "neso", "all"],
     )
     p.add_argument("--years", type=int, nargs="+", default=[datetime.now().year])
     p.add_argument(
@@ -48,6 +49,23 @@ def main() -> None:
         help="met_office_nwp: re-extract/re-download even if output already exists",
     )
     p.add_argument(
+        "--start", type=str, default=None,
+        help="met_office_aws: ISO start date (default: 2 years ago)",
+    )
+    p.add_argument(
+        "--end", type=str, default=None,
+        help="met_office_aws: ISO end date (default: today)",
+    )
+    p.add_argument(
+        "--init-step-hours", type=int, default=3,
+        help="met_office_aws: gap between init-times to fetch (default 3)",
+    )
+    p.add_argument(
+        "--max-lead-hours", type=int, default=15,
+        help="met_office_aws: forecast lead hours per init to keep (default 15 = UK-2km cap; "
+             "needs >= horizon + init-step for full coverage)",
+    )
+    p.add_argument(
         "--packages", nargs="+", default=None,
         help="neso: CKAN package ids (default: GridSight-relevant set)",
     )
@@ -74,11 +92,19 @@ def main() -> None:
     met_hours = None if args.hours and -1 in args.hours else args.hours
     met_fn = mirror_met_office_nwp_raw if args.raw else ingest_met_office_nwp
 
+    aws_end = pd.Timestamp(args.end) if args.end else pd.Timestamp.now("UTC")
+    aws_start = pd.Timestamp(args.start) if args.start else aws_end - pd.DateOffset(years=2)
+
     handlers = {
         "ocf_pv": lambda: ingest_ocf(args.years),
         "pv_live": lambda: ingest_pv_live(args.years),
         "met_office_nwp": lambda: met_fn(
             args.years, months=args.months, hours=met_hours,
+            workers=args.workers, overwrite=args.overwrite,
+        ),
+        "met_office_aws": lambda: ingest_met_office_aws(
+            aws_start.strftime("%Y-%m-%d"), aws_end.strftime("%Y-%m-%d"),
+            init_step_h=args.init_step_hours, max_lead_h=args.max_lead_hours,
             workers=args.workers, overwrite=args.overwrite,
         ),
         "neso": lambda: ingest_neso(

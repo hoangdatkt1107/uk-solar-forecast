@@ -1,5 +1,4 @@
-"""NESO Data Portal (CKAN) -> Bronze parquet
-"""
+"""NESO Data Portal (CKAN) -> Bronze parquet"""
 from __future__ import annotations
 import json
 import re
@@ -24,11 +23,9 @@ def _neso_dir(package: str) -> Path:
     d.mkdir(parents=True, exist_ok=True)
     return d
 
-
 def _slug(name: str) -> str:
     s = re.sub(r"[^0-9A-Za-z]+", "_", str(name)).strip("_").lower()
     return s or "resource"
-
 
 def _load_state(package: str) -> dict:
     f = _neso_dir(package) / "_state.json"
@@ -38,7 +35,6 @@ def _load_state(package: str) -> dict:
         except Exception:
             return {}
     return {}
-
 
 def _save_state(package: str, state: dict) -> None:
     (_neso_dir(package) / "_state.json").write_text(json.dumps(state, indent=2))
@@ -95,7 +91,6 @@ def _download_csv_to_parquet(client, resource: dict, out_path: Path,
     finally:
         shutil.rmtree(tmp.parent, ignore_errors=True)
 
-
 def ingest_neso(
     packages: list[str] | None = None,
     years: list[int] | None = None,
@@ -105,7 +100,7 @@ def ingest_neso(
 
     try:
         import httpx
-        import pyarrow  # noqa: F401
+        import pyarrow  
     except ImportError as e:
         logger.error(f"missing dep: {e}. pip install httpx pyarrow")
         return

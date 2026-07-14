@@ -1,0 +1,160 @@
+"""
+    python -m modeling.serve                        # stack, 12h (default config)
+    python -m modeling.serve --model chronos        # chronos, 12h
+    python -m modeling.serve --model both --horizon-steps 24
+
+Writes GRIDSIGHT_SERVE_DIR/forecast_{model}_{H}h.{parquet,json}. The JSON is what the
+API serves. `serve_all` builds gold once and emits every requested model (cheap: each
+model only forecasts the next `horizon`, a few dozen half-hours)
+"""
+from __future__ import annotations
+import json
+import os
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+from loguru import logger
+
+from .config import ModelConfig
+from .predict import predict_gold
+from data_ingestion.gold.build import build_gold
+from data_ingestion.gold.common import TS
+
+_WEATHER = {"ssrd_uk": "ssrd", "tcc_uk": "tcc", "lcc_uk": "lcc",
+            "t2m_uk": "t2m", "ws10_uk": "ws10"}
+# Configurable so the Azure serve-job can write to the shared Azure Files mount
+_OUT_DIR = Path(os.getenv("GRIDSIGHT_SERVE_DIR", "artifacts/serve"))
+_CHRONOS_MODEL = os.getenv("GRIDSIGHT_CHRONOS_MODEL", "amazon/chronos-bolt-base")
+_CHRONOS_CTX = 512
+
+
+def _build(cfg: ModelConfig, hours_ahead: int | None, now: str | None):
+    horizon = cfg.horizon_step
+    hours_ahead = hours_ahead or horizon // 2
+    now = (pd.Timestamp.now("UTC") if now is None
+           else pd.Timestamp(now, tz="UTC")).floor("30min")
+    gold = build_gold(horizon, extend_to=now + pd.Timedelta(hours=hours_ahead))
+    if not gold.empty:
+        gold[TS] = pd.to_datetime(gold[TS], utc=True)
+    return gold, now, hours_ahead
+
+
+def _emit(gold: pd.DataFrame, preds: pd.DataFrame, now: pd.Timestamp,
+          hours_ahead: int, model_tag: str) -> pd.DataFrame:
+    """Merge weather/NESO/actual context onto preds, keep future slots, write JSON."""
+    preds[TS] = pd.to_datetime(preds[TS], utc=True)
+    keep = [TS, "target_mw", "nwp_age_h", "embedded_solar_mw", *_WEATHER]
+    ctx = gold[[c for c in keep if c in gold.columns]]
+    df = (preds.merge(ctx, on=TS, how="left")
+          .rename(columns={**_WEATHER, "pred_q10": "q10", "pred_q50": "q50",
+                           "pred_q90": "q90", "embedded_solar_mw": "neso",
+                           "target_mw": "actual"}))
+
+    fut = df[df[TS] >= now].sort_values(TS).reset_index(drop=True)
+    logger.info(f"serve[{model_tag}]: now={now:%Y-%m-%d %H:%M}Z "
+                f"horizon={hours_ahead}h points={len(fut)}")
+
+    cols = ["q10", "q50", "q90", "ssrd", "tcc", "lcc", "t2m", "ws10",
+            "neso", "nwp_age_h", "actual"]
+    recs = []
+    for row in fut.to_dict("records"):
+        rec = {"timestamp_utc": pd.Timestamp(row[TS]).isoformat()}
+        for c in cols:
+            v = row.get(c)
+            rec[c] = None if v is None or pd.isna(v) else round(float(v), 4)
+        recs.append(rec)
+
+    _OUT_DIR.mkdir(parents=True, exist_ok=True)
+    tag = f"{hours_ahead}h"
+    fut.to_parquet(_OUT_DIR / f"forecast_{model_tag}_{tag}.parquet", index=False)
+    payload = {"generated_at": now.isoformat(), "horizon_h": hours_ahead,
+               "model": model_tag, "n_points": len(recs), "forecast": recs}
+    text = json.dumps(payload, indent=2)
+    (_OUT_DIR / f"forecast_{model_tag}_{tag}.json").write_text(text)
+    logger.success(f"serve[{model_tag}]: wrote {len(recs)} points -> "
+                   f"{_OUT_DIR}/forecast_{model_tag}_{tag}.json")
+    return fut
+
+
+def _chronos_forward(gold: pd.DataFrame, now: pd.Timestamp, hours_ahead: int) -> pd.DataFrame:
+    """Univariate Chronos: forecast the target's own path to now+hours_ahead, in MW."""
+    import torch
+    from chronos import BaseChronosPipeline
+
+    g = gold.sort_values(TS).reset_index(drop=True)
+    y = g["target_cf"].to_numpy("float32")
+    cap = (g["capacity_mwp"].to_numpy("float32") if "capacity_mwp" in g
+           else np.ones(len(g), "float32"))
+    ts = pd.to_datetime(g[TS])
+    day_all = (g["is_daylight"] == 1).to_numpy() if "is_daylight" in g else np.ones(len(g), bool)
+
+    obs = np.where(np.isfinite(y))[0]
+    if not len(obs):
+        return pd.DataFrame(columns=[TS, "pred_q10", "pred_q50", "pred_q90"])
+    origin = int(obs[-1])
+    origin_t = ts.iloc[origin]
+    end = now + pd.Timedelta(hours=hours_ahead)
+    pred_len = int((end - origin_t) / pd.Timedelta(minutes=30))
+    pred_len = max(1, min(pred_len, 64))                 # chronos-bolt path cap
+
+    ctx = torch.tensor(np.nan_to_num(y[max(0, origin - _CHRONOS_CTX + 1): origin + 1]))
+    pipe = BaseChronosPipeline.from_pretrained(_CHRONOS_MODEL, device_map="cpu",
+                                               torch_dtype=torch.float32)
+    q, _ = pipe.predict_quantiles([ctx], prediction_length=pred_len,
+                                  quantile_levels=[0.1, 0.5, 0.9])
+    arr = q[0].cpu().numpy()                              # [pred_len, 3] in capacity-factor
+
+    cap_by_ts = dict(zip(ts, cap))
+    day_by_ts = dict(zip(ts, day_all))
+    rows = []
+    for s in range(pred_len):
+        vt = origin_t + pd.Timedelta(minutes=30 * (s + 1))
+        c = cap_by_ts.get(vt, cap[origin])
+        dayl = day_by_ts.get(vt, True)
+        vals = [max(0.0, float(arr[s, j])) * c if dayl else 0.0 for j in range(3)]
+        rows.append({TS: vt, "pred_q10": vals[0], "pred_q50": vals[1], "pred_q90": vals[2]})
+    return pd.DataFrame(rows)
+
+def serve_all(cfg: ModelConfig = ModelConfig(), hours_ahead: int | None = None,
+              now: str | None = None, models=("stack", "chronos")) -> dict:
+    """Build gold once, forecast the next horizon with each requested model"""
+    gold, now, hours_ahead = _build(cfg, hours_ahead, now)
+    if gold.empty:
+        logger.error("serve: empty gold — build silver first")
+        return {}
+    out = {}
+    if "stack" in models:
+        out["stack"] = _emit(gold, predict_gold(gold, cfg.artifacts_dir), now, hours_ahead, "stack")
+    if "chronos" in models:
+        try:
+            out["chronos"] = _emit(gold, _chronos_forward(gold, now, hours_ahead), now, hours_ahead, "chronos")
+        except Exception as e:                           # chronos is a nice-to-have
+            logger.warning(f"serve[chronos]: skipped ({e})")
+    return out
+
+def run(cfg: ModelConfig = ModelConfig(), hours_ahead: int | None = None,
+        now: str | None = None, model_tag: str = "stack") -> pd.DataFrame:
+    """Single-model serve (kept for the CLI / back-compat)."""
+    res = serve_all(cfg, hours_ahead, now, models=(model_tag,))
+    return res.get(model_tag, pd.DataFrame())
+
+def _cli() -> None:
+    import argparse
+    import dataclasses
+
+    p = argparse.ArgumentParser(description="Live serve: build features & forecast the next horizon")
+    p.add_argument("--horizon-steps", type=int, default=None,
+                   help="gold/model horizon in 30-min steps (24=12h, 12=6h).")
+    p.add_argument("--now", default=None, help="override 'now' (UTC ISO); default = current time")
+    p.add_argument("--model", default="stack", choices=["stack", "chronos", "both"])
+    a = p.parse_args()
+
+    cfg = ModelConfig()
+    if a.horizon_steps is not None:
+        cfg = dataclasses.replace(cfg, horizon_step=a.horizon_steps)
+    models = ("stack", "chronos") if a.model == "both" else (a.model,)
+    serve_all(cfg, now=a.now, models=models)
+
+if __name__ == "__main__":
+    _cli()

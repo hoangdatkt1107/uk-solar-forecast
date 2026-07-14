@@ -16,8 +16,9 @@ class Settings(BaseSettings):
     data_dir: Path = Field(default=Path("./data"))
 
     bronze_hf_repo: str
-    # optional; if unset, derived from bronze_hf_repo (bronze -> silver/gold)
+    # optional; if unset, derived from bronze_hf_repo (bronze -> silver/gold/model)
     silver_hf_repo: str | None = None
     gold_hf_repo: str | None = None
+    model_hf_repo: str | None = None
 
 settings = Settings()

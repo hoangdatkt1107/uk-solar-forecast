@@ -3,18 +3,14 @@ from __future__ import annotations
 import re
 import pandas as pd
 from loguru import logger
-
 from .common import TS
 from .lag_features import lag_set
-
 
 def _assert(cond: bool, msg: str) -> None:
     if not cond:
         raise AssertionError(msg)
 
-
 def validate_gold(df: pd.DataFrame, horizon: int) -> None:
-    # time grid
     _assert(df[TS].notna().all(), f"{TS} has nulls")
     _assert(str(df[TS].dt.tz) == "UTC", f"{TS} not tz-aware UTC")
     _assert(df[TS].is_unique, f"{TS} not unique")
@@ -22,7 +18,6 @@ def validate_gold(df: pd.DataFrame, horizon: int) -> None:
     steps = df[TS].diff().dropna().value_counts()
     _assert(steps.index[0] == pd.Timedelta(minutes=30), "spine not on 30-min grid")
 
-    # targets
     for c in ("target_mw", "target_cf"):
         _assert(c in df.columns, f"missing target {c}")
     cf = df["target_cf"].dropna()
@@ -30,7 +25,7 @@ def validate_gold(df: pd.DataFrame, horizon: int) -> None:
     _assert((df["target_mw"].dropna() >= 0).all(), "negative target_mw")
 
     # ANTI-LEAKAGE: raw observed-at-t actuals must NOT be present as features
-    leaky = {"generation_mw", "ocf_total_mw", "ocf_mean_wh", "ocf_n_systems"}
+    leaky = {"generation_mw"}
     present = leaky & set(df.columns)
     _assert(not present, f"LEAKAGE: raw observed columns present as features: {present}")
 

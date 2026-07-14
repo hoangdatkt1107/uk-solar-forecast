@@ -1,0 +1,538 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>GridSight — UK Solar Forecast</title>
+<style>
+  :root{
+    --paper:#f5f5f2; --card:#ffffff; --ink:#1e232a; --muted:#7c838c; --faint:#aab0b7;
+    --hair:#e8e8e2; --hair-2:#f0f0ec;
+    --amber:#c98a25; --amber-band:rgba(201,138,37,.12);
+    --teal:#2f6f62; --neso:#c1c5cb; --night:rgba(30,36,44,.045);
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    --mono:ui-monospace,"SF Mono","Cascadia Code",Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{background:var(--paper); color:var(--ink); font-family:var(--sans);
+    font-size:15px; line-height:1.5; -webkit-font-smoothing:antialiased; min-height:100vh}
+  .wrap{max-width:1400px; margin:0 auto; padding:38px clamp(18px,4vw,40px) 60px}
+  .lab{font-size:10.5px; letter-spacing:.16em; text-transform:uppercase; color:var(--muted)}
+  .num{font-family:var(--mono); font-variant-numeric:tabular-nums}
+
+  header{display:flex; justify-content:space-between; align-items:flex-start;
+    gap:24px; flex-wrap:wrap; padding-bottom:20px; border-bottom:1px solid var(--hair)}
+  .title{display:flex; align-items:baseline; gap:11px}
+  .title h1{font-size:28px; font-weight:600; letter-spacing:-.015em; margin:0; color:var(--ink)}
+  .title .dot{width:9px; height:9px; border-radius:50%; background:var(--amber); transform:translateY(-2px)}
+  .title .sub{display:block; color:var(--muted); font-size:13px; margin-top:3px}
+  .title .sub b{color:var(--ink); font-weight:600}
+  .issued{text-align:right; color:var(--muted); font-size:12.5px}
+  .issued .num{color:var(--ink); font-size:14px}
+
+  .main{display:grid; grid-template-columns:minmax(0,1fr) 322px; gap:24px; margin-top:22px; align-items:start}
+
+  .stats{display:flex; gap:34px; flex-wrap:wrap; padding:2px 2px 20px}
+  .stat .v{font-family:var(--mono); font-variant-numeric:tabular-nums; font-size:26px;
+    font-weight:500; margin-top:5px; letter-spacing:-.01em}
+  .stat .v small{font-size:12px; color:var(--muted); font-weight:400; font-family:var(--sans)}
+  .stat.good .v{color:var(--teal)} .stat.bad .v{color:var(--amber)}
+
+  .controls{display:flex; gap:14px 22px; flex-wrap:wrap; align-items:center; padding-bottom:15px}
+  .ctl{display:flex; align-items:center; gap:9px}
+  .spacer{flex:1}
+  .seg{display:inline-flex; gap:2px; border:1px solid var(--hair); border-radius:8px; padding:2px; background:var(--card)}
+  .seg button{border:none; background:none; font:inherit; font-size:12.5px; color:var(--muted);
+    padding:5px 12px; border-radius:6px; cursor:pointer; letter-spacing:.01em; transition:color .15s}
+  .seg button:hover{color:var(--ink)}
+  .seg button.on{background:var(--paper); color:var(--ink); box-shadow:inset 0 0 0 1px var(--hair)}
+  .nav{display:inline-flex; gap:4px}
+  .nav button{width:30px; height:30px; border:1px solid var(--hair); background:var(--card); border-radius:7px;
+    color:var(--muted); cursor:pointer; font-size:14px; line-height:1; display:grid; place-items:center; transition:color .15s,border-color .15s}
+  .nav button:hover{color:var(--ink); border-color:var(--faint)}
+  .nav button.wide{width:auto; padding:0 11px; font-size:11px; letter-spacing:.04em; text-transform:uppercase}
+
+  .card{background:var(--card); border:1px solid var(--hair); border-radius:9px}
+  .chart{padding:18px 16px 10px}
+  .chart-head{display:flex; justify-content:space-between; align-items:baseline; padding:0 4px 8px; gap:14px; flex-wrap:wrap}
+  .legend{display:flex; gap:16px; font-size:12px; color:var(--muted)}
+  .legend span{display:inline-flex; align-items:center; gap:7px}
+  .sw{width:15px; height:2px; border-radius:2px; background:currentColor}
+  .sw.d{background:none; border-top:2px dashed var(--neso); height:0}
+  .sw.b{height:9px; width:15px; background:var(--amber-band); border:1px solid rgba(201,138,37,.4)}
+  svg.plot{display:block; width:100%; height:auto; touch-action:none; cursor:ew-resize}
+  svg.plot text{font-family:var(--mono); fill:var(--faint); font-size:11px}
+  .axis-line{stroke:var(--hair)} .grid{stroke:var(--hair-2)}
+  .q50{fill:none; stroke:var(--amber); stroke-width:2.2; stroke-linejoin:round; stroke-linecap:round}
+  .actual{fill:none; stroke:var(--teal); stroke-width:1.7; stroke-linejoin:round; stroke-linecap:round}
+  .neso{fill:none; stroke:var(--neso); stroke-width:1.5; stroke-dasharray:2 4; stroke-linecap:round}
+  .band{fill:var(--amber-band)} .night{fill:var(--night)}
+  .cross{stroke:var(--ink); stroke-width:1; opacity:.18}
+  .live-bg{fill:rgba(201,138,37,.05)}
+  .now-line{stroke:var(--amber); stroke-width:1; stroke-dasharray:3 3; opacity:.55}
+  svg.plot text.livetag{fill:var(--amber); font-size:10px; letter-spacing:.08em}
+  .dot{fill:var(--amber); stroke:var(--card); stroke-width:2.5} .dot.a{fill:var(--teal)}
+
+  .readout{margin-top:16px; padding:18px 20px}
+  .rd-grid{display:grid; grid-template-columns:1.3fr 1fr 1fr; gap:26px; align-items:start}
+  .wx{display:grid; grid-template-columns:repeat(4,1fr); gap:22px; margin-top:16px; padding-top:15px; border-top:1px solid var(--hair)}
+  .wx .item .v{font-family:var(--mono); font-variant-numeric:tabular-nums; font-size:19px; font-weight:500; margin:4px 0 2px}
+  .rd .lab{margin-bottom:6px}
+  .rd .big{font-family:var(--mono); font-variant-numeric:tabular-nums; font-size:30px;
+    font-weight:500; letter-spacing:-.02em; line-height:1.05}
+  .rd .big small{font-size:12px; color:var(--muted); font-weight:400; letter-spacing:0}
+  .rd .v{font-family:var(--mono); font-variant-numeric:tabular-nums; font-size:21px; font-weight:500; margin-top:1px}
+  .rd .v.tl{color:var(--teal)} .rd .v.am{color:var(--amber)}
+  .rd .sub{font-size:12px; color:var(--muted); margin-top:3px}
+  .verdict{margin-top:18px; padding-top:15px; border-top:1px solid var(--hair); font-size:13.5px; color:var(--ink)}
+  .verdict b{font-family:var(--mono); font-weight:500} .verdict .g{color:var(--teal)} .verdict .a{color:var(--amber)}
+  .hint{color:var(--faint); font-size:12px; margin-top:7px}
+
+  /* sidebar */
+  aside{position:sticky; top:20px}
+  .side-tabs{display:flex; gap:2px; border:1px solid var(--hair); border-radius:8px; padding:2px; background:var(--card); margin-bottom:14px}
+  .side-tabs button{flex:1; border:none; background:none; font:inherit; font-size:12.5px; color:var(--muted);
+    padding:7px 10px; border-radius:6px; cursor:pointer; transition:color .15s}
+  .side-tabs button.on{background:var(--paper); color:var(--ink); box-shadow:inset 0 0 0 1px var(--hair)}
+  .panel{padding:20px 20px 22px}
+  .panel h2{font-size:14px; font-weight:600; margin:0 0 8px; letter-spacing:-.01em}
+  .panel h2:not(:first-child){margin-top:20px}
+  .panel p{font-size:13px; color:#4a5058; margin:0 0 10px}
+  .panel .kpi{display:flex; gap:20px; padding:14px 0 4px; margin:6px 0 12px; border-top:1px solid var(--hair); border-bottom:1px solid var(--hair)}
+  .panel .kpi div{flex:1}
+  .panel .kpi .n{font-family:var(--mono); font-size:22px; font-weight:500; letter-spacing:-.01em}
+  .panel .kpi .n.tl{color:var(--teal)}
+  .src{display:flex; gap:11px; padding:11px 0; border-bottom:1px solid var(--hair-2); font-size:12.5px}
+  .src:last-child{border-bottom:none}
+  .src .tag{flex:none; width:9px; height:9px; border-radius:2px; margin-top:4px}
+  .src b{display:block; color:var(--ink); font-weight:600; font-size:13px}
+  .src span{color:var(--muted)}
+
+  footer{display:flex; justify-content:space-between; gap:16px; flex-wrap:wrap; margin-top:24px; font-size:12px; color:var(--faint)}
+  footer b{color:var(--muted); font-weight:500}
+  :focus-visible{outline:2px solid var(--amber); outline-offset:3px; border-radius:3px}
+  .plot:focus{outline:none}
+  .plot:focus-visible{outline:1px solid var(--faint); outline-offset:5px; border-radius:6px}
+
+  @media (max-width:980px){
+    .main{grid-template-columns:1fr}
+    aside{position:static}
+  }
+  @media (max-width:620px){ .rd-grid{grid-template-columns:1fr 1fr; gap:18px} .wx{grid-template-columns:1fr 1fr; gap:16px} }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="title">
+      <span class="dot"></span>
+      <div>
+        <h1>GridSight</h1>
+        <span class="sub">UK national solar output · probabilistic, half-hourly · by <b>Tien Dat Hoang</b></span>
+      </div>
+    </div>
+    <div class="issued">
+      <div class="lab">Viewing</div>
+      <div class="num" id="issued">—</div>
+      <div style="margin-top:2px" id="sub-model">Stack LGBM+TCN · 12 h ahead</div>
+    </div>
+  </header>
+
+  <div class="main">
+    <!-- LEFT: controls + chart + stats + readout -->
+    <div>
+      <div class="controls">
+        <div class="ctl"><span class="lab">Window</span>
+          <div class="seg" id="seg-tf">
+            <button data-tf="48">24 h</button>
+            <button data-tf="336">1 wk</button>
+            <button data-tf="1440">1 mo</button>
+            <button data-tf="4368">3 mo</button>
+            <button data-tf="17520">1 yr</button>
+          </div></div>
+        <div class="ctl"><span class="lab">Model</span>
+          <div class="seg" id="seg-model">
+            <button data-model="stack">Stack</button>
+            <button data-model="chronos">Chronos</button>
+          </div></div>
+        <div class="ctl"><span class="lab">Horizon</span>
+          <div class="seg" id="seg-h">
+            <button data-h="6h">6&nbsp;h</button>
+            <button data-h="12h">12&nbsp;h</button>
+          </div></div>
+        <div class="spacer"></div>
+        <div class="nav" id="nav">
+          <button data-step="-1" title="Back">‹</button>
+          <button data-step="1" title="Forward">›</button>
+          <button data-step="latest" class="wide" title="Jump to latest">Latest</button>
+        </div>
+      </div>
+
+      <div class="card chart">
+        <div class="chart-head">
+          <span class="lab">Output · MW · <span id="span">—</span></span>
+          <div class="legend">
+            <span style="color:var(--amber)"><i class="sw b"></i>p10–p90</span>
+            <span style="color:var(--amber)"><i class="sw"></i>forecast</span>
+            <span style="color:var(--teal)"><i class="sw"></i>actual</span>
+            <span style="color:var(--muted)"><i class="sw d"></i>NESO</span>
+          </div>
+        </div>
+        <svg class="plot" id="plot" viewBox="0 0 1000 468" role="img" tabindex="0"
+             aria-label="Solar generation forecast versus actual and NESO baseline over time"></svg>
+      </div>
+
+      <section class="stats" id="stats"></section>
+
+      <div class="card readout">
+        <div class="rd-grid">
+          <div class="rd">
+            <div class="lab">Slot <span class="num" id="rd-time">—</span></div>
+            <div class="big"><span id="r-q50">—</span> <small>· <span id="r-model">forecast</span> p50</small></div>
+            <div class="sub" id="r-band">p10–p90 —</div>
+          </div>
+          <div class="rd"><div class="lab">Actual</div><div class="v tl" id="r-act">—</div><div class="sub" id="r-inband">—</div></div>
+          <div class="rd"><div class="lab">NESO baseline</div><div class="v" id="r-neso">—</div><div class="sub" id="r-nesoerr">—</div></div>
+        </div>
+        <div class="wx">
+          <div class="lab" style="grid-column:1/-1">Weather driving this half-hour · Met Office UK-2km</div>
+          <div class="item"><div class="lab">Irradiance</div><div class="v am" id="g-ssrd">—</div><div class="sub">W/m² surface</div></div>
+          <div class="item"><div class="lab">Cloud cover</div><div class="v" id="g-cloud">—</div><div class="sub">total</div></div>
+          <div class="item"><div class="lab">Wind 10 m</div><div class="v" id="g-wind">—</div><div class="sub">m/s</div></div>
+          <div class="item"><div class="lab">Air temp</div><div class="v" id="g-temp">—</div><div class="sub">2 m</div></div>
+        </div>
+        <div class="verdict" id="verdict">—</div>
+        <div class="hint">Drag the chart to pan through time · ← → to step · hover to inspect a half-hour · switch model, window &amp; horizon above.</div>
+      </div>
+    </div>
+
+    <!-- RIGHT: about / data sidebar -->
+    <aside>
+      <div class="side-tabs" id="side-tabs">
+        <button data-tab="about" class="on">About</button>
+        <button data-tab="data">Data &amp; sources</button>
+      </div>
+
+      <div class="card panel" id="tab-about">
+        <h2>What is this?</h2>
+        <p>GridSight forecasts <b>Great Britain's national solar power output</b> — half-hourly,
+           6–12&nbsp;hours ahead — as a probabilistic range (p10 / p50 / p90), not a single guess.</p>
+
+        <h2>What is NESO?</h2>
+        <p>The <b>National Energy System Operator</b> (formerly National Grid ESO) runs GB's
+           electricity system. It publishes its own embedded solar &amp; wind forecast to balance
+           the grid — the operational benchmark every model is judged against.</p>
+
+        <h2>Beating NESO</h2>
+        <p>Across <b>2 years of out-of-sample</b> data, the stacked model (LightGBM&nbsp;+&nbsp;TCN,
+           quantile) cuts NESO's mean absolute error roughly in half, and keeps ~9 in 10 actuals
+           inside its p10–p90 band. Scrub the timeline — it holds across seasons.</p>
+        <div class="kpi">
+          <div><div class="lab">Skill vs NESO</div><div class="n tl" id="k-skill">—</div></div>
+          <div><div class="lab">Coverage</div><div class="n" id="k-cov">—</div></div>
+        </div>
+        <p style="color:var(--faint);font-size:12px">Skill = reduction in MAE vs NESO over the full record.
+           The stack beats the univariate Chronos baseline, which trails NESO.</p>
+      </div>
+
+      <div class="card panel" id="tab-data" style="display:none">
+        <h2>Where the data comes from</h2>
+        <div class="src"><span class="tag" style="background:var(--amber)"></span>
+          <div><b>Met Office UK-2km NWP</b><span>AWS Open Data. Irradiance, cloud, temp, wind.
+          New model run every 3&nbsp;h — the forecast's weather driver.</span></div></div>
+        <div class="src"><span class="tag" style="background:var(--teal)"></span>
+          <div><b>PV_Live — Sheffield Solar</b><span>Actual GB solar generation by GSP,
+          half-hourly (updates ~30&nbsp;min). The ground truth &amp; recent-history features.</span></div></div>
+        <div class="src"><span class="tag" style="background:var(--neso)"></span>
+          <div><b>NESO Data Portal</b><span>Embedded solar &amp; wind forecast, hourly, out to
+          14&nbsp;days. The baseline we compare against.</span></div></div>
+        <h2>How it's built</h2>
+        <p>Bronze → Silver → Gold parquet on HuggingFace. Features: NWP as-of-forecast (leak-safe),
+           clear-sky, calendar, lagged output. Model: TCN-Q + LGBM-Q stacked by a linear
+           quantile meta-learner. Served hourly on Azure Container Apps.</p>
+        <p style="color:var(--faint);font-size:12px" id="d-gen">—</p>
+      </div>
+    </aside>
+  </div>
+
+  <footer>
+    <div>Sources <b>PV_Live · NESO · Met Office UK-2km (AWS)</b></div>
+    <div><b>Tien Dat Hoang</b> · <span id="foot-window">—</span></div>
+  </footer>
+</div>
+
+<!-- Live overlay: set this to your forecast API base URL (Container App) to draw the
+     real next-12h forecast at the right edge. Leave "" for history-only (offline demo). -->
+<script>window.GRIDSIGHT_API_BASE = window.GRIDSIGHT_API_BASE || "";</script>
+<script>
+const API_BASE = String(window.GRIDSIGHT_API_BASE || "").replace(/\/+$/, "");
+const P={ml:52,mr:14,mt:16,mb:30,w:1000,h:468};
+const $=id=>document.getElementById(id);
+const NS="http://www.w3.org/2000/svg";
+const el=(n,a={})=>{const e=document.createElementNS(NS,n);for(const k in a)e.setAttribute(k,a[k]);return e;};
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const gw=v=>v==null?"—":(v/1000).toFixed(2);
+const MON=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const p2=n=>String(n).padStart(2,"0");
+
+let HIST=null, S=null, Q=null, curH="12h", curModel="stack";
+let winPts=336, i0=0, sel=-1, R=[], yMax=16000, START=0, STEP=1800000;
+let dragging=false, dragX=0, dragI0=0, didDrag=false;
+
+const tsAt=i=>new Date(START + i*STEP);
+
+// ---- data window + downsample -------------------------------------------------
+function agg(a,i,j,fn){let acc=null,c=0;for(let k=i;k<j;k++){const v=a[k];if(v==null)continue;
+  acc=acc==null?v:fn(acc,v);c++;}return c?acc:null;}
+function mean(a,i,j){let s=0,c=0;for(let k=i;k<j;k++){if(a[k]!=null){s+=a[k];c++;}}return c?s/c:null;}
+
+function build(){
+  const n=S.n; winPts=clamp(winPts,24,n); i0=clamp(i0,0,n-winPts);
+  const i1=i0+winPts, f=Math.max(1,Math.ceil(winPts/700));
+  R=[];
+  for(let i=i0;i<i1;i+=f){
+    const j=Math.min(i1,i+f), mid=i+(j-i>>1);
+    R.push({i:mid, t:tsAt(mid),
+      q50:mean(Q.q50,i,j), actual:mean(S.actual,i,j), neso:mean(S.neso,i,j),
+      q10:agg(Q.q10,i,j,Math.min), q90:agg(Q.q90,i,j,Math.max),
+      ssrd:mean(S.ssrd,i,j), cloud:mean(S.cloud,i,j), temp:mean(S.temp,i,j),
+      wind:mean(S.wind,i,j), day:agg(S.day,i,j,Math.max)});
+  }
+  let m=0; for(const d of R){m=Math.max(m,d.q90||0,d.actual||0,d.neso||0);}
+  yMax=Math.max(4000,Math.ceil(m/2000)*2000);
+  if(sel<i0||sel>=i1) sel=-1;
+  windowStats(i0,i1);
+  draw(); updateReadout();
+  $("issued").textContent=fmtDay(tsAt(i0))+" – "+fmtDay(tsAt(i1-1));
+  $("span").textContent=spanLabel();
+  $("foot-window").textContent=R.length+" pts shown · "+curH+" ahead";
+}
+
+// ---- stats over the visible window (raw points) -------------------------------
+function windowStats(i0,i1){
+  let sm=0,sn=0,c=0,inb=0,cb=0,peak=0;
+  for(let k=i0;k<i1;k++){
+    const a=S.actual[k],q=Q.q50[k],ne=S.neso[k],lo=Q.q10[k],hi=Q.q90[k];
+    if(a!=null) peak=Math.max(peak,a);
+    if(a==null||q==null||ne==null||a<50) continue;
+    sm+=Math.abs(a-q); sn+=Math.abs(a-ne); c++;
+    if(lo!=null&&hi!=null){cb++; if(a>=lo&&a<=hi) inb++;}
+  }
+  const skill=c?1-sm/sn:null, cov=cb?inb/cb:null, mae=c?sm/c:null;
+  $("stats").innerHTML=[
+    ["Skill vs NESO", skill==null?"—":(skill>=0?"+":"")+(skill*100).toFixed(0), "% lower MAE", skill>=0?"good":"bad"],
+    ["Coverage p10–p90", cov==null?"—":(cov*100).toFixed(0), "% of actuals", "good"],
+    ["Model MAE", mae==null?"—":(mae/1000).toFixed(2), "GW abs error", ""],
+    ["Peak actual", (peak/1000).toFixed(1), "GW · window", ""],
+  ].map(s=>`<div class="stat ${s[3]}"><div class="lab">${s[0]}</div><div class="v">${s[1]}<small> ${s[2]}</small></div></div>`).join("");
+}
+
+// ---- draw ---------------------------------------------------------------------
+const xAt=k=>P.ml+(R.length<2?0:(k/(R.length-1))*(P.w-P.ml-P.mr));
+const yAt=v=>P.mt+(P.h-P.mt-P.mb)*(1-clamp(v,0,yMax)/yMax);
+function linePath(f){let s="",pen=false;R.forEach((d,k)=>{const v=f(d);
+  if(v==null){pen=false;return;}s+=(pen?"L":"M")+xAt(k).toFixed(1)+" "+yAt(v).toFixed(1)+" ";pen=true;});return s;}
+
+function draw(){
+  const s=$("plot"); s.innerHTML="";
+  // gridlines + y labels
+  for(let g=0;g<=yMax;g+=(yMax<=8000?2000:4000)){
+    s.appendChild(el("line",{class:"grid",x1:P.ml,x2:P.w-P.mr,y1:yAt(g),y2:yAt(g)}));
+    const t=el("text",{x:P.ml-8,y:yAt(g)+3.5,"text-anchor":"end"});t.textContent=(g/1000)+(g===yMax?" GW":"");s.appendChild(t);
+  }
+  // night shading (only when points are dense enough to be meaningful)
+  if(winPts<=400){let i=0;while(i<R.length){if(R[i].day===0){let j=i;while(j<R.length&&R[j].day===0)j++;
+    const a=xAt(Math.max(0,i-.5)),b=xAt(Math.min(R.length-1,j-.5));
+    s.appendChild(el("rect",{class:"night",x:a,y:P.mt,width:Math.max(0,b-a),height:P.h-P.mt-P.mb}));i=j;}else i++;}}
+  // live forecast region (right edge) — real next-12h pulled from the API
+  if(S&&S.liveFrom!=null&&S.liveFrom<i0+winPts){
+    let k=R.findIndex(d=>d.i>=S.liveFrom); if(k<0)k=R.length-1;
+    const x=k<=0?P.ml:xAt(k);
+    s.appendChild(el("rect",{class:"live-bg",x:x,y:P.mt,width:Math.max(0,(P.w-P.mr)-x),height:P.h-P.mt-P.mb}));
+    s.appendChild(el("line",{class:"now-line",x1:x,x2:x,y1:P.mt,y2:P.h-P.mb}));
+  }
+  // p10–p90 band
+  let up="",dn="";R.forEach((d,k)=>{if(d.q90!=null)up+=(up?"L":"M")+xAt(k).toFixed(1)+" "+yAt(d.q90).toFixed(1)+" ";});
+  for(let k=R.length-1;k>=0;k--){if(R[k].q10!=null)dn+="L"+xAt(k).toFixed(1)+" "+yAt(R[k].q10).toFixed(1)+" ";}
+  if(up)s.appendChild(el("path",{class:"band",d:up+dn+"Z"}));
+  // lines: NESO, actual, forecast
+  s.appendChild(el("path",{class:"neso",d:linePath(d=>d.neso)}));
+  s.appendChild(el("path",{class:"actual",d:linePath(d=>d.actual)}));
+  s.appendChild(el("path",{class:"q50",d:linePath(d=>d.q50)}));
+  // x time axis
+  const ticks=Math.min(7,R.length); const sp=spanHours();
+  for(let t=0;t<ticks;t++){const k=Math.round(t*(R.length-1)/(ticks-1||1));const x=xAt(k);
+    s.appendChild(el("line",{class:"axis-line",x1:x,x2:x,y1:P.h-P.mb,y2:P.h-P.mb+4}));
+    const tx=el("text",{x:x,y:P.h-P.mb+16,"text-anchor":t===0?"start":t===ticks-1?"end":"middle"});
+    tx.textContent=tlabel(R[k].t,sp);s.appendChild(tx);}
+  s.appendChild(el("line",{class:"axis-line",x1:P.ml,x2:P.w-P.mr,y1:P.h-P.mb,y2:P.h-P.mb}));
+  // "LIVE" tag on the forecast region
+  if(S&&S.liveFrom!=null&&S.liveFrom>=i0&&S.liveFrom<i0+winPts){
+    let k=R.findIndex(d=>d.i>=S.liveFrom); if(k<0)k=R.length-1; const x=k<=0?P.ml:xAt(k);
+    const t=el("text",{class:"livetag",x:Math.min(x+5,P.w-P.mr-34),y:P.mt+11}); t.textContent="LIVE"; s.appendChild(t);}
+  // selection crosshair + dots
+  if(sel>=0){const k=R.reduce((best,d,idx)=>Math.abs(d.i-sel)<Math.abs(R[best].i-sel)?idx:best,0);
+    const d=R[k],x=xAt(k);
+    s.appendChild(el("line",{class:"cross",x1:x,x2:x,y1:P.mt,y2:P.h-P.mb}));
+    if(d.actual!=null)s.appendChild(el("circle",{class:"dot a",cx:x,cy:yAt(d.actual),r:4}));
+    if(d.q50!=null)s.appendChild(el("circle",{class:"dot",cx:x,cy:yAt(d.q50),r:4}));}
+}
+
+// ---- readout ------------------------------------------------------------------
+function updateReadout(){
+  const k=sel>=0?R.reduce((b,d,idx)=>Math.abs(d.i-sel)<Math.abs(R[b].i-sel)?idx:b,0):R.length-1;
+  const d=R[k]; if(!d)return;
+  $("rd-time").textContent=fmtFull(d.t);
+  $("r-q50").textContent=gw(d.q50); $("r-band").textContent="p10–p90  "+gw(d.q10)+" – "+gw(d.q90)+" GW";
+  $("r-act").textContent=gw(d.actual);
+  $("r-neso").textContent=gw(d.neso);
+  // weather driving this half-hour (model-independent — from Met Office NWP)
+  $("g-ssrd").textContent=d.ssrd==null?"—":Math.round(d.ssrd);
+  $("g-cloud").textContent=d.cloud==null?"—":Math.round(d.cloud)+"%";
+  $("g-wind").textContent=d.wind==null?"—":(d.wind/10).toFixed(1);
+  $("g-temp").textContent=d.temp==null?"—":Math.round(d.temp)+"°C";
+  const inb=(d.actual!=null&&d.q10!=null&&d.q90!=null&&d.actual>=d.q10&&d.actual<=d.q90);
+  $("r-inband").textContent=d.actual==null?"—":inb?"inside band":"outside band";
+  const v=$("verdict");
+  if(d.actual!=null&&d.q50!=null&&d.neso!=null){
+    const eF=Math.abs(d.actual-d.q50),eN=Math.abs(d.actual-d.neso),diff=eN-eF;
+    $("r-nesoerr").textContent=(d.actual>=d.neso?"+":"")+gw(d.actual-d.neso)+" GW vs actual";
+    v.innerHTML=diff>=0
+      ? `Model closer to actual by <b class="g">${gw(diff)} GW</b> than NESO here${inb?`, actual inside the band.`:`.`}`
+      : `NESO closer by <b class="a">${gw(-diff)} GW</b> at this slot — the band still ${inb?"covers":"misses"} the actual.`;
+  } else {
+    $("r-nesoerr").textContent="—";
+    v.innerHTML=`Forecast issued — actual not yet settled for this half-hour.`;
+  }
+}
+
+// ---- labels -------------------------------------------------------------------
+const spanHours=()=>winPts*0.5;
+function spanLabel(){const h=spanHours();return h<=48?Math.round(h)+" h":h<=24*45?Math.round(h/24)+" days":(h/24/30.4).toFixed(1)+" months";}
+function tlabel(d,sp){if(sp<=48)return p2(d.getUTCHours())+":"+p2(d.getUTCMinutes());
+  if(sp<=24*45)return p2(d.getUTCDate())+"/"+p2(d.getUTCMonth()+1);
+  return MON[d.getUTCMonth()]+" "+String(d.getUTCFullYear()).slice(2);}
+const fmtDay=d=>p2(d.getUTCDate())+" "+MON[d.getUTCMonth()]+" "+d.getUTCFullYear();
+const fmtFull=d=>fmtDay(d)+" "+p2(d.getUTCHours())+":"+p2(d.getUTCMinutes())+"Z";
+
+// ---- interaction --------------------------------------------------------------
+function pxToIndex(clientX){const s=$("plot"),r=s.getBoundingClientRect();
+  const x=clamp((clientX-r.left)/r.width*P.w,P.ml,P.w-P.mr);
+  const k=Math.round((x-P.ml)/(P.w-P.ml-P.mr)*(R.length-1||0));return R[clamp(k,0,R.length-1)]?.i ?? -1;}
+
+function bindPlot(){
+  const s=$("plot");
+  s.addEventListener("pointerdown",e=>{dragging=true;didDrag=false;dragX=e.clientX;dragI0=i0;s.setPointerCapture(e.pointerId);});
+  s.addEventListener("pointermove",e=>{
+    if(dragging){const r=s.getBoundingClientRect();
+      const dpx=(e.clientX-dragX)/r.width*P.w;
+      const dIdx=Math.round(-dpx/(P.w-P.ml-P.mr)*(R.length-1||1)*Math.max(1,Math.ceil(winPts/700)));
+      if(Math.abs(e.clientX-dragX)>3)didDrag=true;
+      i0=clamp(dragI0+dIdx,0,S.n-winPts);build();
+    } else {sel=pxToIndex(e.clientX);draw();updateReadout();}
+  });
+  s.addEventListener("pointerup",e=>{dragging=false;if(!didDrag){sel=pxToIndex(e.clientX);draw();updateReadout();}});
+  s.addEventListener("pointerleave",()=>{if(!dragging){sel=-1;draw();updateReadout();}});
+  s.addEventListener("keydown",e=>{
+    const step=e.shiftKey?Math.round(winPts/2):Math.max(1,Math.round(winPts/48));
+    if(e.key==="ArrowRight"){pan(step);e.preventDefault();}
+    else if(e.key==="ArrowLeft"){pan(-step);e.preventDefault();}
+  });
+}
+function pan(delta){i0=clamp(i0+delta,0,S.n-winPts);sel=-1;build();}
+
+function mark(){
+  document.querySelectorAll("[data-model]").forEach(b=>b.classList.toggle("on",b.dataset.model===curModel));
+  document.querySelectorAll("[data-h]").forEach(b=>b.classList.toggle("on",b.dataset.h===curH));
+  document.querySelectorAll("[data-tf]").forEach(b=>b.classList.toggle("on",+b.dataset.tf===winPts));
+}
+
+// ---- live overlay (real next-12h forecast from the API, appended at the edge) ----
+function _grow(s,N){const g=(a,f)=>{while(a.length<N)a.push(f);};
+  g(s.actual,null);g(s.neso,null);g(s.ssrd,null);g(s.cloud,null);g(s.temp,null);g(s.wind,null);g(s.day,0);
+  for(const m in s.models){g(s.models[m].q10,null);g(s.models[m].q50,null);g(s.models[m].q90,null);}
+  s.n=N;}
+
+async function ensureLive(hz,model){
+  if(!API_BASE) return false;
+  const s=HIST.series[hz], q=s.models[model];
+  if(q._live) return false;                               // already merged
+  let recs;
+  try{const r=await fetch(`${API_BASE}/forecast?model=${model}&horizon=${hz}`,{cache:"no-store"});
+    if(!r.ok) return false; recs=(await r.json()).forecast;}catch(_){return false;}
+  if(!recs||!recs.length) return false;
+  const st=Date.parse(s.start), sp=s.step_min*60000, oldN=s.n;
+  let maxI=oldN-1; recs.forEach(r=>{const i=Math.round((Date.parse(r.timestamp_utc)-st)/sp); if(i>maxI)maxI=i;});
+  if(maxI<oldN){q._live=true; return false;}              // API not ahead of history (stale) — nothing to append
+  _grow(s,maxI+1);
+  const w=!s._liveW;                                       // fill shared weather/neso once per horizon
+  recs.forEach(r=>{const i=Math.round((Date.parse(r.timestamp_utc)-st)/sp); if(i<oldN||i>=s.n)return;
+    if(r.q10!=null)q.q10[i]=r.q10; if(r.q50!=null)q.q50[i]=r.q50; if(r.q90!=null)q.q90[i]=r.q90;
+    if(w){ if(r.neso!=null)s.neso[i]=r.neso; if(r.ssrd!=null)s.ssrd[i]=r.ssrd;
+      if(r.tcc!=null)s.cloud[i]=r.tcc*100; if(r.t2m!=null)s.temp[i]=r.t2m-273.15; if(r.ws10!=null)s.wind[i]=r.ws10*10;
+      s.day[i]=(r.ssrd!=null&&r.ssrd>1)?1:0; }});
+  s._liveW=true; q._live=true; s.liveFrom=oldN;
+  return true;
+}
+
+// ---- boot ---------------------------------------------------------------------
+function applyView(resetPan){
+  S=HIST.series[curH]; Q=S.models[curModel];
+  START=Date.parse(S.start); STEP=S.step_min*60000;
+  winPts=clamp(winPts,24,S.n);
+  if(resetPan) i0=S.n-winPts;
+  i0=clamp(i0,0,S.n-winPts); sel=-1;
+  const name=curModel==="stack"?"Stack LGBM+TCN":"Chronos-bolt";
+  $("sub-model").textContent=name+" · "+curH+" ahead";
+  $("r-model").textContent=curModel;
+  build();
+  // fetch live forecast (if API configured) and redraw when it arrives
+  ensureLive(curH,curModel).then(changed=>{ if(changed){ if(resetPan) i0=S.n-winPts; build(); } });
+}
+
+async function boot(){
+  // controls
+  $("seg-tf").addEventListener("click",e=>{const b=e.target.closest("[data-tf]");if(!b)return;
+    const anchor=i0+Math.round(winPts/2);winPts=+b.dataset.tf;winPts=clamp(winPts,24,S.n);
+    i0=clamp(anchor-Math.round(winPts/2),0,S.n-winPts);mark();build();});
+  $("seg-model").addEventListener("click",e=>{const b=e.target.closest("[data-model]");if(!b)return;
+    curModel=b.dataset.model;mark();applyView(false);});
+  $("seg-h").addEventListener("click",e=>{const b=e.target.closest("[data-h]");if(!b)return;
+    curH=b.dataset.h;mark();applyView(false);});
+  $("nav").addEventListener("click",e=>{const b=e.target.closest("[data-step]");if(!b)return;
+    if(b.dataset.step==="latest"){i0=S.n-winPts;sel=-1;build();}else pan(+b.dataset.step*Math.round(winPts/2));});
+  $("side-tabs").addEventListener("click",e=>{const b=e.target.closest("[data-tab]");if(!b)return;
+    document.querySelectorAll("#side-tabs button").forEach(x=>x.classList.toggle("on",x===b));
+    $("tab-about").style.display=b.dataset.tab==="about"?"":"none";
+    $("tab-data").style.display=b.dataset.tab==="data"?"":"none";});
+  bindPlot();
+
+  // data
+  try{
+    const r=await fetch("history.json",{cache:"no-store"});
+    if(!r.ok)throw 0;
+    HIST=await r.json();
+  }catch(_){
+    $("plot").innerHTML='<text x="500" y="230" text-anchor="middle" fill="#7c838c" font-size="14">Serve over HTTP to load history.json — e.g. `python -m http.server`.</text>';
+    return;
+  }
+  // headline KPIs (full record)
+  fullStats();
+  mark(); applyView(true);
+  $("d-gen").textContent="Generated "+(HIST.generated_at||"").slice(0,10)+" · "+S.n.toLocaleString()+" half-hours × 2 horizons × 2 models";
+}
+
+function fullStats(){
+  const s=HIST.series["12h"], q=s.models.stack;let sm=0,sn=0,c=0,inb=0,cb=0;
+  for(let k=0;k<s.n;k++){const a=s.actual[k],p=q.q50[k],ne=s.neso[k],lo=q.q10[k],hi=q.q90[k];
+    if(a==null||p==null||ne==null||a<50)continue;sm+=Math.abs(a-p);sn+=Math.abs(a-ne);c++;
+    if(lo!=null&&hi!=null){cb++;if(a>=lo&&a<=hi)inb++;}}
+  $("k-skill").textContent=c?"+"+((1-sm/sn)*100).toFixed(0)+"%":"—";
+  $("k-cov").textContent=cb?(inb/cb*100).toFixed(0)+"%":"—";
+}
+
+boot();
+</script>
+</body>
+</html>

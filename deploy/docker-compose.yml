@@ -1,0 +1,37 @@
+# cd deploy && cp ../.env.example ../.env   (fill in HF token + repo)
+# docker compose --env-file ../.env up --build api   (start the API)
+#  docker compose --env-file ../.env run --rm job     (run one serve cycle)
+
+services:
+  api:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.api
+    ports:
+      - "8000:8000"
+    environment:
+      GRIDSIGHT_SERVE_DIR: /mnt/serve
+      GRIDSIGHT_CORS_ORIGINS: "*"
+    volumes:
+      - serve:/mnt/serve
+
+  job:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.job
+    environment:
+      GRIDSIGHT_SERVE_DIR: /mnt/serve
+      GRIDSIGHT_DATA_DIR: /app/data
+      GRIDSIGHT_HF_TOKEN: ${GRIDSIGHT_HF_TOKEN}
+      GRIDSIGHT_BRONZE_HF_REPO: ${GRIDSIGHT_BRONZE_HF_REPO}
+      # for a fast local smoke test
+      GRIDSIGHT_BRONZE_LOOKBACK_DAYS: "3"
+      # don't push bronze back to HF from a local test run (cloud sets this to 1)
+      GRIDSIGHT_PUSH_BRONZE: "0"
+    volumes:
+      - serve:/mnt/serve
+      - ./_local_data:/app/data    
+    command: ["python", "pipeline.py", "serve"]
+
+volumes:
+  serve:

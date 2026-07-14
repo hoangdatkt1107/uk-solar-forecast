@@ -1,12 +1,9 @@
 """PV_Live GSP observations (api.pvlive.uk) -> Bronze parquet"""
 from __future__ import annotations
 from datetime import datetime, timezone
-
 import pandas as pd
 from loguru import logger
-
 from .common import _ensure_partition_dir, _is_partition_done
-
 
 def ingest_pv_live(years: list[int]) -> None:
     import httpx

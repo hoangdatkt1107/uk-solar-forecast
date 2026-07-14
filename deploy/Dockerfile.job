@@ -1,0 +1,35 @@
+# GridSight serve/retrain JOB — full data + modeling stack
+# docker build -f deploy/Dockerfile.job -t gridsight-job
+FROM python:3.13-slim
+
+WORKDIR /app
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    GRIDSIGHT_SERVE_DIR=/mnt/serve \
+    GRIDSIGHT_DATA_DIR=/app/data \
+    HF_HOME=/app/hf-cache \
+    # LightGBM (stack) and Chronos (torch) both load OpenMP in one process → guard the
+    # duplicate-runtime segfault; keep threads modest for the small container
+    KMP_DUPLICATE_LIB_OK=TRUE \
+    OMP_NUM_THREADS=2
+
+# own libs in the wheels, so nothing else is needed.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends libgomp1 \
+ && rm -rf /var/lib/apt/lists/*
+
+# torch first, from the CPU wheel index
+COPY requirements-job.txt .
+RUN pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cpu "torch==2.12.1" \
+ && pip install --no-cache-dir -r requirements-job.txt
+
+# Chronos weights are downloaded at runtime (baking them here hangs under amd64 emulation
+COPY src/ src/
+COPY configs/ configs/
+COPY data_ingestion/ data_ingestion/
+COPY modeling/ modeling/
+COPY pipeline.py .
+# baked-in trained models (artifacts/model_6h, artifacts/model_12h)
+COPY artifacts/ artifacts/
+
+CMD ["python", "pipeline.py", "serve"]

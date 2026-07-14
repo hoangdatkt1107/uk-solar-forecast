@@ -11,7 +11,7 @@ from .common import BRONZE_LOCAL_DIR, CONFIGS_DIR, _ensure_partition_dir, hf_tok
 
 MET_OFFICE_HF_REPO = "openclimatefix/met-office-uk-deterministic-solar"
 
-# our column  ->  (Met Office group suffix, inner zarr variable name)
+# column  ->  (Met Office group suffix, inner zarr variable name)
 _MET_VARMAP = {
     "ssrd": ("radiation_flux_in_shortwave_total_downward_at_surface",
              "surface_downwelling_shortwave_flux_in_air"),

@@ -1,0 +1,18 @@
+# docker build -f deploy/Dockerfile.api -t gridsight-api
+FROM python:3.13-slim
+
+WORKDIR /app
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    GRIDSIGHT_SERVE_DIR=/mnt/serve
+
+COPY requirements-api.txt .
+RUN pip install --no-cache-dir -r requirements-api.txt
+
+COPY serving/ serving/
+# dashboard served from the API (Static Web Apps isn't available in the deploy region)
+COPY frontend/index.html frontend/history.json frontend/
+ENV GRIDSIGHT_FRONTEND_DIR=/app/frontend
+
+EXPOSE 8000
+CMD ["uvicorn", "serving.api:app", "--host", "0.0.0.0", "--port", "8000"]

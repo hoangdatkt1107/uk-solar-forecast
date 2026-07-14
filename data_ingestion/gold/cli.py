@@ -5,11 +5,8 @@
 """
 from __future__ import annotations
 import argparse
-
 from loguru import logger
-
 from .build import run, DEFAULT_HORIZON
-
 
 def main() -> None:
     p = argparse.ArgumentParser(description="Gold feature-store build (from local Silver)")
@@ -24,7 +21,6 @@ def main() -> None:
 
     logger.info(f"=== Building Gold (horizon={args.horizon_steps} steps) ===")
     run(horizon=args.horizon_steps, upload=args.upload)
-
 
 if __name__ == "__main__":
     main()

@@ -8,8 +8,7 @@ model that depends only on the solar zenith angle:
     GHI_clear = 1098 * cos(zenith) * exp(-0.059 / cos(zenith)),   cos(zenith) > 0
 
 This gives the meta-learner a calibrated "ceiling" for how much sun is physically
-possible at each instant, which helps re-scale the base quantiles.
-"""
+possible at each instant, which helps re-scale the base quantiles """
 from __future__ import annotations
 
 import numpy as np

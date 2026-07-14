@@ -2,7 +2,6 @@ from __future__ import annotations
 import numpy as np  
 import pdb
 
-
 def pinball_loss(y_true: np.ndarray, y_pred: np.ndarray, q: float) -> float:
     residual = y_true - y_pred
     result = np.maximum(q * residual, (q -1) * residual)

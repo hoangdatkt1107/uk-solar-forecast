@@ -46,15 +46,18 @@ def validate_pv_live(df: pd.DataFrame) -> None:
 
 
 def validate_met_office_nwp(df: pd.DataFrame) -> None:
-    _check_utc_index(df)
+    # grid keeps the init dimension, so TS is not unique; the (valid, init) pair is
+    _assert(TS in df.columns, f"missing {TS}")
+    _assert(df[TS].notna().all(), f"{TS} has nulls")
+    _assert(str(df[TS].dt.tz) == "UTC", f"{TS} not tz-aware UTC (got {df[TS].dt.tz})")
+    _assert("init_time" in df.columns, "missing init_time")
+    _assert(not df.duplicated([TS, "init_time"]).any(), "(valid, init) pair not unique")
     for c in ("ssrd_uk", "tcc_uk", "lcc_uk", "t2m_uk", "ws10_uk"):
         _check_range(df, c)
-    if "init_time" in df.columns:
-        m = df["init_time"].notna()
-        _assert((df.loc[m, "init_time"] <= df.loc[m, TS]).all(),
-                "init_time > valid_time (leakage!)")
-    if "nwp_age_h" in df.columns:
-        _assert((df["nwp_age_h"].dropna() >= 0).all(), "negative nwp_age_h")
+    m = df["init_time"].notna()
+    _assert((df.loc[m, "init_time"] <= df.loc[m, TS]).all(),
+            "init_time > valid_time (leakage!)")
+    _assert((df["nwp_age_h"].dropna() >= 0).all(), "negative nwp_age_h")
     logger.success("contract OK: silver_met_office_nwp")
 
 
