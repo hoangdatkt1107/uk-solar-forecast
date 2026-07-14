@@ -1,6 +1,5 @@
 from __future__ import annotations
 from dataclasses import dataclass
-
 import numpy as np
 import pandas as pd
 from loguru import logger
@@ -19,7 +18,7 @@ class Dataset:
         if self.cfg.day_light_only and "is_daylight" in self.df.columns:
             return (self.df["is_daylight"] == 1).to_numpy()
         else:
-            np.ones(len(self.df), dtype=bool)
+            return np.ones(len(self.df), dtype=bool)
 
     def split_masks(self):
         """
@@ -27,8 +26,19 @@ class Dataset:
         """
         if "timestamp_utc" in self.df.columns:
             ts = self.df["timestamp_utc"]
-            val_start = pd.Timestamp(self.cfg.val_start, tz="UTC")
-            test_start = pd.Timestamp(self.cfg.test_start, tz="UTC")
+            cfg = self.cfg
+            if cfg.val_start and cfg.test_start:            # pinned absolute split
+                val_start = pd.Timestamp(cfg.val_start, tz="UTC")
+                test_start = pd.Timestamp(cfg.test_start, tz="UTC")
+            else:                                           # rolling: slide with the data
+                max_ts = pd.Timestamp(ts.max())
+                if max_ts.tzinfo is None:
+                    max_ts = max_ts.tz_localize("UTC")
+                test_start = max_ts - pd.Timedelta(weeks=cfg.test_weeks)
+                val_start = test_start - pd.Timedelta(weeks=cfg.val_weeks)
+                logger.info(f"rolling split: train<{val_start.date()} | "
+                            f"val {val_start.date()}->{test_start.date()} | "
+                            f"test>={test_start.date()} (data max {max_ts.date()})")
             train_data = (ts < val_start).to_numpy()
             val_data = ((ts >= val_start) & (ts < test_start)).to_numpy()
             test_data = (ts >= test_start).to_numpy()
