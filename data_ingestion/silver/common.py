@@ -19,10 +19,16 @@ SILVER_HF_REPO = (getattr(settings, "silver_hf_repo", None)
 STEP = pd.Timedelta(minutes=30)
 TS = "timestamp_utc"  
 
+# Absolute sanity bounds — a coarse "this is definitely garbage" net (negatives, absurd
+# magnitudes). They are deliberately generous: the solar ceilings used to be 15 GW, which
+# GB's fleet outgrew (capacity is now ~22 GW), so real sunny-midday peaks above 15 GW were
+# silently deleted, punching NaN holes in the target that surfaced as dips in the forecast
+# 1/2/3/7 days later via the lag features. Real quality control for the solar series is
+# capacity-relative — see clamp_to_capacity() — which never goes stale as the fleet grows.
 RANGES = {
-    "generation_mw": (0.0, 15000.0),
-    "embedded_solar_mw": (0.0, 15000.0),
-    "embedded_wind_mw": (0.0, 30000.0),
+    "generation_mw": (0.0, 60000.0),
+    "embedded_solar_mw": (0.0, 60000.0),
+    "embedded_wind_mw": (0.0, 60000.0),
     "ssrd_uk": (0.0, 1200.0),
     "tcc_uk": (0.0, 1.0),
     "lcc_uk": (0.0, 1.0),
@@ -61,6 +67,31 @@ def clamp_to_nan(df: pd.DataFrame, col: str) -> int:
         return 0
     lo, hi = RANGES[col]
     bad = (df[col] < lo) | (df[col] > hi)
+    n = int(bad.sum())
+    if n:
+        df.loc[bad, col] = np.nan
+    return n
+
+def clamp_to_capacity(df: pd.DataFrame, col: str, capacity_col: str,
+                      factor: float = 1.5) -> int:
+    """NaN values that are negative or exceed installed capacity * factor.
+
+    Capacity-relative, so it scales with the fleet and never needs raising again — unlike a
+    fixed MW ceiling, which silently deleted real peaks once GB solar outgrew it.
+
+    `factor` is deliberately loose (1.5x): reported capacity lags actual installs, so a
+    genuine reading can sit above it, and the cost of deleting a real peak (a NaN hole that
+    propagates into the lag features days later) is far worse than keeping a slightly odd
+    one. 1.5 also matches the gold contract's `target_cf` bound of [0, 1.5] — anything above
+    that fails there anyway. For reference, the highest capacity factor ever observed in
+    this dataset is ~0.74, so this leaves ~2x headroom while still catching real garbage
+    (negatives, unit errors, order-of-magnitude spikes). Rows with unknown capacity fall
+    back to the coarse RANGES net. Returns the count clamped.
+    """
+    if col not in df.columns or capacity_col not in df.columns:
+        return 0
+    cap = df[capacity_col]
+    bad = (df[col] < 0) | (cap.notna() & (cap > 0) & (df[col] > cap * factor))
     n = int(bad.sum())
     if n:
         df.loc[bad, col] = np.nan

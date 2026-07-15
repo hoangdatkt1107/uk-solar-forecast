@@ -10,7 +10,7 @@ from loguru import logger
 
 from .common import (
     TS, BRONZE_LOCAL_DIR, to_utc, floor_30, canonical_index, enforce_float32,
-    clamp_to_nan, apply_missing_policy, write_silver,
+    clamp_to_nan, clamp_to_capacity, apply_missing_policy, write_silver,
 )
 from .contracts import validate_neso
 
@@ -84,8 +84,12 @@ def build_silver_neso() -> pd.DataFrame:
     # year archives don't share slots, but coalesce any boundary dupes just in case
     df = pd.concat(reduced, ignore_index=True).drop_duplicates(TS, keep="last")
     df = enforce_float32(df, _VALCOLS)
+    # coarse net first, then capacity-relative QC (NESO ships its own capacity columns) so
+    # the bounds track the fleet instead of a fixed MW ceiling that goes stale
     for c in ("embedded_solar_mw", "embedded_wind_mw"):
         clamp_to_nan(df, c)
+    clamp_to_capacity(df, "embedded_solar_mw", "embedded_solar_capacity_mw")
+    clamp_to_capacity(df, "embedded_wind_mw", "embedded_wind_capacity_mw")
 
     df = df.set_index(TS)[_VALCOLS]
     grid = canonical_index(df.index.min(), df.index.max())

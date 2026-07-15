@@ -4,7 +4,7 @@ import pandas as pd
 from loguru import logger
 from .common import (
     TS, STEP, to_utc, floor_30, canonical_index, enforce_float32, clamp_to_nan,
-    apply_missing_policy, read_bronze, write_silver,
+    clamp_to_capacity, apply_missing_policy, read_bronze, write_silver,
 )
 from .contracts import validate_pv_live
 
@@ -21,9 +21,14 @@ def build_silver_pv_live() -> pd.DataFrame:
     df = df.assign(**{TS: ts})
 
     df = enforce_float32(df, ["generation_mw", "capacity_mwp"])
-    n_neg = clamp_to_nan(df, "generation_mw")  
-    if n_neg:
-        logger.info(f"pv_live: {n_neg} out-of-range generation values -> NaN")
+    # Quality control against installed capacity, not a fixed MW ceiling: generation can't
+    # meaningfully exceed the fleet, and this keeps working as the fleet grows. (A hardcoded
+    # 15 GW ceiling used to delete real >15 GW summer peaks — those NaNs then propagated
+    # into the lag features and dented the forecast 1/2/3/7 days later.)
+    n_bad = clamp_to_nan(df, "generation_mw")            # coarse net (negatives / absurd)
+    n_bad += clamp_to_capacity(df, "generation_mw", "capacity_mwp")
+    if n_bad:
+        logger.info(f"pv_live: {n_bad} out-of-range generation values -> NaN")
 
     # one row per slot: prefer the freshest fetch
     df = (df.sort_values([TS, "fetched_at"])
