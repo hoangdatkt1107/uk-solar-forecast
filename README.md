@@ -1,47 +1,58 @@
-# GridSight UK — 2026
+# GridSight UK
 
-**AI-Based Solar Energy Forecasting for the UK National Grid**
+**Probabilistic solar generation forecasting for the GB national grid** — half-hourly,
+6–12 hours ahead, as a p10 / p50 / p90 range rather than a single number.
 
-A personal project by **Tien Dat Hoang** · [live dashboard](https://orange-mushroom-083511803.7.azurestaticapps.net)
+**It cuts the grid operator's own forecast error roughly in half — and it is live.**
 
----
+<p>
+  <a href="https://orange-mushroom-083511803.7.azurestaticapps.net"><b>▶ Live dashboard</b></a>
+  · a personal project by <b>Tien Dat Hoang</b>
+</p>
 
-## Table of Contents
-
-1. [Project Overview](#1-project-overview)
-   - [Live Architecture](#15-live-architecture) · [Why it is deployed this way](#why-it-is-deployed-this-way)
-2. [Repository Structure](#2-repository-structure)
-3. [Quick Start](#3-quick-start)
-4. [Data Pipeline — Bronze → Silver → Gold](#4-data-pipeline--bronze--silver--gold)
-   - [Bronze — Raw Downloads](#41-bronze--raw-downloads)
-   - [Silver — Clean & Align](#42-silver--clean--align)
-   - [Gold — Feature Store](#43-gold--feature-store)
-5. [Gold Feature Reference](#5-gold-feature-reference)
-6. [HuggingFace Repositories](#6-huggingface-repositories)
-7. [Environment Setup](#7-environment-setup)
+![live](https://img.shields.io/badge/status-live%20on%20Azure-success)
+![serve](https://img.shields.io/badge/serve-hourly%20·%202%20vCPU%20%2F%204%20GiB-blue)
+![retrain](https://img.shields.io/badge/retrain-weekly%20·%20GitHub%20Actions-black)
+![python](https://img.shields.io/badge/python-3.13-blue)
+![license](https://img.shields.io/badge/license-see%20LICENSE-lightgrey)
 
 ---
 
-## 1. Project Overview
+## Results
 
-GridSight UK is a probabilistic solar power generation forecasting system for the UK national grid. It produces calibrated 80% prediction intervals (q10 / q50 / q90) across two forecast horizons:
+The benchmark is **NESO** — the National Energy System Operator's own embedded-solar
+forecast, i.e. the number GB's grid is actually balanced on. Beating it is the whole point.
 
-| Horizon | Steps | Use case |
-|---|---|---|
-| 6-hour ahead | 12 steps | Intra-day trading |
-| 12-hour ahead | 24 steps | Half-day-ahead market (primary target) |
+Two years of **out-of-sample** data (2024-07 → present, 35,728 half-hours), scored on
+**daylight slots only** (night is trivially zero and would flatter every model):
 
+| Horizon | GridSight MAE | NESO MAE | Skill (MAE reduction) | p10–p90 coverage |
+|---|---|---|---|---|
+| **6 h ahead** | **381 MW** | 874 MW | **−56.4 %** | 93.6 % |
+| **12 h ahead** | **393 MW** | 873 MW | **−55.0 %** | 93.6 % |
 
-Three model families are compared: **LSTM-Q** (deep learning), **TCN-Q + LGBM-Q + Linear-Q stack** (physics-ML hybrid), and **Chronos + LoRA** (foundation model fine-tuning).
+- **Roughly half the operator's error**, and the margin holds across seasons — scrub the
+  timeline on the dashboard rather than taking one good week's word for it.
+- **The intervals are honest but conservative.** 93.6 % of actuals land inside a band that
+  is nominally sized for 80 %, so the model is under-confident: the range is wider than it
+  needs to be. Tightening that calibration is the top open item, not a solved problem.
+- **The foundation model lost.** A univariate zero-shot **Chronos** baseline reaches only
+  570–636 MW MAE — *worse than NESO*. Weather (NWP irradiance) and the physics of solar
+  geometry carry this problem; a general-purpose time-series model that never sees the sky
+  cannot compete. That negative result is kept in the repo and on the dashboard on purpose.
 
-The stack model runs **live in production**: an hourly job on Azure refreshes the data,
-rebuilds features and publishes the next-12h forecast; a dashboard shows it against the
-operator's own baseline. See [Live Architecture](#15-live-architecture) below, and
-[`deploy/README.md`](deploy/README.md) for provisioning details.
+**How the forecast is built:** a quantile stack — **LightGBM** (tabular, weather + calendar
++ lags) and a **TCN** (sequence) each predict q10/q50/q90, and a linear quantile
+meta-learner combines them out-of-fold, with a clear-sky physical term as a feature.
+
+**Contents** · [Architecture](#architecture) · [Why it is deployed this way](#why-it-is-deployed-this-way)
+· [Repository Structure](#repository-structure) · [Quick Start](#quick-start)
+· [Data Pipeline](#data-pipeline--bronze--silver--gold) · [Feature Reference](#gold-feature-reference)
+· [Environment Setup](#environment-setup)
 
 ---
 
-## 1.5 Live Architecture
+## Architecture
 
 The system splits into **three jobs on different schedules**, deliberately placed on
 different infrastructure (see [why](#why-it-is-deployed-this-way)).
@@ -119,7 +130,7 @@ from that budget:
 
 ---
 
-## 2. Repository Structure
+## Repository Structure
 
 ```
 gridsight-uk-2026/
@@ -164,15 +175,15 @@ gridsight-uk-2026/
 
 ---
 
-## 3. Quick Start
+## Quick Start
 
 ### Prerequisites
 
 - Python 3.11+
 - A HuggingFace token with read access to the dataset repos
-- `HF_TOKEN` set in `.env` (see [Environment Setup](#7-environment-setup))
+- `HF_TOKEN` set in `.env` (see [Environment Setup](#environment-setup))
 
-### Full local build in three commands
+### Full local build
 
 ```bash
 # 1. Pull Bronze data from HuggingFace
@@ -181,11 +192,17 @@ gridsight-uk-2026/
 # 2. Build Silver from local Bronze (no network)
 ./env/bin/python -m data_ingestion.silver --source all
 
-# 3. Build Gold from local Silver (no network) — day-ahead (24h horizon)
-./env/bin/python -m data_ingestion.gold
+# 3. Build Gold for the two horizons the live models use (no network)
+./env/bin/python -m data_ingestion.gold --horizon-steps 24   # 12 h ahead (primary)
+./env/bin/python -m data_ingestion.gold --horizon-steps 12   # 6 h ahead
 ```
 
-The Gold feature table is written to `data/gold/gold_features/year=YYYY/month=MM/`.
+Gold is written per horizon to `data/gold/gold_features_{12h,6h}/year=YYYY/month=MM/` — the
+tables are separate because the leakage-safe lags depend on the horizon.
+
+> The CLI's bare default is `--horizon-steps 48` (24 h day-ahead), a leftover from an
+> earlier scope. The deployed system runs `GRIDSIGHT_HORIZONS=24,12` — pass the flag
+> explicitly to reproduce what is live.
 
 ### Skip rebuilding — pull pre-built data directly
 
@@ -207,7 +224,7 @@ If you only need the data and do not want to recompute it, pull Silver and Gold 
 
 ---
 
-## 4. Data Pipeline — Bronze → Silver → Gold
+## Data Pipeline — Bronze → Silver → Gold
 
 The pipeline follows the **medallion architecture**: raw → clean → model-ready. Each layer reads only the previous layer and is rebuildable from scratch.
 
@@ -232,7 +249,7 @@ Internet APIs / HuggingFace
 
 ---
 
-### 4.1 Bronze — Raw Downloads
+### Bronze — Raw Downloads
 
 Bronze does one job: download the raw data and save it to parquet. No cleaning, no joining. Each source gets its own folder, partitioned by `year=YYYY/month=MM/`.
 
@@ -304,7 +321,7 @@ data/bronze/
 
 ---
 
-### 4.2 Silver — Clean & Align
+### Silver — Clean & Align
 
 Silver reads local Bronze and applies four deterministic cleaning rules to every source, then validates the result with hard-fail contracts. All Silver tables share a canonical UTC 30-minute time index (`timestamp_utc`).
 
@@ -367,7 +384,7 @@ data/silver/
 
 ---
 
-### 4.3 Gold — Feature Store
+### Gold — Feature Store
 
 Gold reads local Silver and produces the final feature table. The entire build is parameterised by `horizon` (number of 30-min steps ahead). This controls which lag features are leakage-safe — all lags are forced to be ≥ horizon.
 
@@ -432,7 +449,7 @@ data/gold/
 
 ---
 
-## 5. Gold Feature Reference
+## Gold Feature Reference
 
 The Gold table (`gold_features`) has **47 columns** on a 30-minute UTC grid (`timestamp_utc`). One row per half-hour slot.
 
@@ -516,7 +533,7 @@ For `horizon=48` (day-ahead), all lags are ≥ 48 steps (≥ 24 hours ago).
 
 ---
 
-## 6. HuggingFace Repositories
+## HuggingFace Repositories
 
 | Layer | HF Dataset Repo | Purpose |
 |---|---|---|
@@ -538,7 +555,7 @@ The sync is incremental and resumable — files already present locally are skip
 
 ---
 
-## 7. Environment Setup
+## Environment Setup
 
 ### 1. Clone the repository
 
@@ -578,24 +595,25 @@ python -m data_ingestion.gold --help
 
 ### Dependencies
 
-| Package | Version | Purpose |
-|---|---|---|
-| `pandas` | ≥ 2.1.0 | Data manipulation |
-| `pyarrow` | ≥ 13.0.0 | Parquet read/write |
-| `numpy` | ≥ 1.26.0 | Numerical operations |
-| `httpx` | ≥ 0.25.0 | API requests (NESO, PV_Live) |
-| `huggingface_hub` | ≥ 0.17.0 | HF dataset downloads/uploads |
-| `scikit-learn` | ≥ 1.3.0 | Model utilities |
-| `matplotlib` / `seaborn` / `plotly` | ≥ latest | Visualisation |
-| `jupyter` | ≥ 1.0.0 | Notebook environment |
-| `python-dotenv` | ≥ 1.0.0 | `.env` file loading |
+Pinned in three requirement sets, split so each container installs only what it needs:
 
-Additional dependencies for specific modules (install as needed):
+| File | Used by | Contains |
+|---|---|---|
+| `requirements-job.txt` | serve + retrain job, GitHub Actions retrain | Everything: ingest (`httpx`, `huggingface_hub`), NWP extraction (`xarray`, `netCDF4`, `pyproj`), dataframes (`pandas`, `pyarrow`), modeling (`lightgbm`, `scikit-learn`, `scipy`, `joblib`), Chronos (`chronos-forecasting`, `transformers`). **`torch` is installed separately** from the CPU wheel index — see `deploy/Dockerfile.job`. |
+| `requirements-api.txt` | FastAPI container | Minimal — the API only reads JSON, so it never installs torch or LightGBM. That is why it runs in 0.25 vCPU. |
+| `requirements.txt` | local / notebooks | Base data-pipeline set. |
 
 ```bash
-pip install zarr pyproj loguru datasets          # Met Office NWP extraction
-pip install torch pytorch-lightning lightning    # LSTM-Q model training
-pip install lightgbm optuna                      # LGBM-Q HPO
-pip install pvlib holidays                       # Solar geometry, UK holidays
-pip install peft transformers accelerate         # Chronos + LoRA fine-tuning
+# local dev — the full job set (matches what runs in the cloud)
+pip install --index-url https://download.pytorch.org/whl/cpu "torch==2.12.1"
+pip install -r requirements-job.txt
 ```
+
+### Models in this repo
+
+| Component | File | Role |
+|---|---|---|
+| **LGBM-Q** | `modeling/base/lgbm_q.py` | Gradient-boosted quantile regressor over the tabular features |
+| **TCN-Q** | `modeling/base/tcn_q.py` | Temporal convolutional net over the 126-step sequence |
+| **Linear-Q stack** | `modeling/stacking.py` | Meta-learner combining both, fit on out-of-fold predictions |
+| **Chronos** | `modeling/chronos_baseline.py` | Univariate zero-shot baseline (`chronos-bolt-base`) — kept for comparison; it loses to NESO |
