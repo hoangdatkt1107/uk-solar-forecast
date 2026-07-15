@@ -2,11 +2,14 @@
 
 **AI-Based Solar Energy Forecasting for the UK National Grid**
 
+A personal project by **Tien Dat Hoang** · [live dashboard](https://orange-mushroom-083511803.7.azurestaticapps.net)
+
 ---
 
 ## Table of Contents
 
 1. [Project Overview](#1-project-overview)
+   - [Live Architecture](#15-live-architecture) · [Why it is deployed this way](#why-it-is-deployed-this-way)
 2. [Repository Structure](#2-repository-structure)
 3. [Quick Start](#3-quick-start)
 4. [Data Pipeline — Bronze → Silver → Gold](#4-data-pipeline--bronze--silver--gold)
@@ -14,9 +17,8 @@
    - [Silver — Clean & Align](#42-silver--clean--align)
    - [Gold — Feature Store](#43-gold--feature-store)
 5. [Gold Feature Reference](#5-gold-feature-reference)
-6. [Team HuggingFace Repositories](#6-team-huggingface-repositories)
+6. [HuggingFace Repositories](#6-huggingface-repositories)
 7. [Environment Setup](#7-environment-setup)
-8. [Week 04 Deliverables](#8-week-04-deliverables)
 
 ---
 
@@ -33,11 +35,88 @@ GridSight UK is a probabilistic solar power generation forecasting system for th
 
 Three model families are compared: **LSTM-Q** (deep learning), **TCN-Q + LGBM-Q + Linear-Q stack** (physics-ML hybrid), and **Chronos + LoRA** (foundation model fine-tuning).
 
-**Live deployment:** the stack model is served on Azure Container Apps — an hourly job
-refreshes bronze, rebuilds features and writes the next-12h forecast, which a FastAPI app
-and a static dashboard read. The heavy weekly retrain runs on GitHub Actions and pushes the
-promoted model to HuggingFace. See [`deploy/README.md`](deploy/README.md) for the full cloud
-architecture, the 4 GiB serve tuning, and the retrain workflow.
+The stack model runs **live in production**: an hourly job on Azure refreshes the data,
+rebuilds features and publishes the next-12h forecast; a dashboard shows it against the
+operator's own baseline. See [Live Architecture](#15-live-architecture) below, and
+[`deploy/README.md`](deploy/README.md) for provisioning details.
+
+---
+
+## 1.5 Live Architecture
+
+The system splits into **three jobs on different schedules**, deliberately placed on
+different infrastructure (see [why](#why-it-is-deployed-this-way)).
+
+```
+  DATA SOURCES (live, free)                    ┌──────────────────────────────┐
+ ┌─────────────────────────┐                   │      HuggingFace Hub         │
+ │ Met Office UK-2km NWP   │  new init /3h     │   (the data lake + registry) │
+ │   (AWS S3 open data)    │────┐              │                              │
+ │ PV_Live GSP actuals     │    │              │  gridsight-bronze  (parquet) │
+ │   (api.pvlive.uk) /30m  │────┼─────────────▶│  gridsight-silver / -gold    │
+ │ NESO embedded forecast  │    │   ingest +   │  gridsight-model  (registry) │
+ │   (CKAN API) /1h        │────┘   push back  └──────────────────────────────┘
+ └─────────────────────────┘                      ▲          │            ▲
+                                                  │          │ pull model │ push
+                                        push bronze          ▼            │ promoted
+                                                  │   ┌──────────────┐    │ model
+   ╔══════════════ AZURE ═══════════════╗         │   │              │    │
+   ║                                    ║         │   │              │    │
+   ║  Container Apps JOB  (cron 0 * * *)║─────────┘   │              │    │
+   ║  gridsight-serve · 2 vCPU / 4 GiB  ║◀────────────┘              │    │
+   ║   refresh tail → silver → gold     ║                            │    │
+   ║   → forecast → forecast_*.json     ║                            │    │
+   ║          │ writes                  ║              ╔═════════ GITHUB ACTIONS ══════╗
+   ║     ┌────▼─────┐                   ║              ║                               ║
+   ║     │Azure File│  share "serve"    ║              ║  weekly-retrain (cron Sun 3am)║
+   ║     └────┬─────┘                   ║              ║  free runner · 16 GB RAM      ║
+   ║          │ reads                   ║              ║   full history → gold → train ║
+   ║  ┌───────▼────────┐                ║              ║   → promote model ────────────╫──┘
+   ║  │ Container App  │ FastAPI, 24/7  ║              ║                               ║
+   ║  │ gridsight-api  │ 0.25 vCPU      ║              ╚═══════════════════════════════╝
+   ║  └───────┬────────┘                ║
+   ║          │ /forecast (CORS)        ║
+   ║  ┌───────▼────────┐                ║
+   ║  │ Static Web App │  dashboard     ║
+   ║  │ (Free tier)    │  + history.json║
+   ║  └────────────────┘                ║
+   ╚════════════════════════════════════╝
+```
+
+**The three jobs**
+
+| Job | Where | When | Weight | What it does |
+|---|---|---|---|---|
+| **serve** | Azure Container Apps Job | hourly (`0 * * * *`) | ~3 min, <4 GiB | Pull recent tail from the sources, push fresh bronze back to HF, rebuild silver+gold, **pull the live model from HF**, write `forecast_*.json` to Azure Files |
+| **api** | Azure Container App | always on | 0.25 vCPU | Read the JSON and serve `/forecast` — never touches the model |
+| **retrain** | **GitHub Actions** | weekly (Sun 03:00 UTC) | ~5.5 GiB peak | Pull the **full** history, rebuild gold, train both horizons on a rolling split, **push the promoted model to HF** |
+
+The two compute jobs never talk to each other — **HuggingFace is the handoff**. Retrain
+publishes a model; serve picks it up on its next hourly run. No redeploy, no coupling.
+
+### Why it is deployed this way
+
+This is a personal project on **free / near-free tiers**, and the shape follows directly
+from that budget:
+
+- **Data lake on HuggingFace, not Azure Storage.** HF hosts the parquet lake for free and
+  `snapshot_download` is incremental. Paying for ADLS would buy nothing here. Bronze must be
+  pushed back **every run** because Met Office S3 only keeps a rolling window of recent
+  inits — NWP not saved is gone for good.
+- **Serve on Azure, sized to fit 4 GiB.** The Container Apps environment is a *legacy
+  Consumption* one, hard-capped at **2 vCPU / 4 GiB** (8 GiB would need a different
+  environment type and a new API URL). So the hourly job is tuned to fit: stack-only (no
+  Chronos), a 2-month bronze window, and current-year NESO. It runs in ~3 min, billed per
+  execution-second — a few $/month.
+- **Retrain on GitHub Actions, not Azure.** Training peaks at **~5.5 GiB** — over the 4 GiB
+  cap. Rather than pay to upgrade the whole environment for one job a week, the weekly
+  retrain runs on GitHub's free 16 GB runner and hands the model over via HF. Free, and the
+  showcase (live hourly serving) still runs on Azure.
+- **Dashboard as a Static Web App (Free).** One HTML page reading one API; a framework and
+  a server would be cost with no benefit. The 2-year backtest ships as a static
+  `history.json`; only the next-12h overlay is fetched live.
+- **Scale-to-zero everywhere it is possible.** The serve job only exists while it runs; the
+  API is the one always-on piece and is deliberately tiny because it never loads a model.
 
 ---
 
@@ -50,7 +129,7 @@ gridsight-uk-2026/
 │   ├── bronze/                  # Raw ingestion (NESO, PV_Live, OCF, Met Office AWS) → parquet + HF upload
 │   ├── silver/                  # Clean / align / quality-check each source (neso.py builds per-file, memory-safe)
 │   ├── gold/                    # Feature engineering → model-ready table (merge, targets, calendar, lags)
-│   └── sync_bronze.py           # Pull team Bronze from HF → local data/bronze/
+│   └── sync_bronze.py           # Pull Bronze from HF → local data/bronze/
 │
 ├── modeling/                    # Models, training, live serving
 │   ├── config.py                # ModelConfig — rolling val/test split, horizons, hyperparams
@@ -91,39 +170,39 @@ gridsight-uk-2026/
 ### Prerequisites
 
 - Python 3.11+
-- A HuggingFace account with access to the `gridsight-team` organisation
+- A HuggingFace token with read access to the dataset repos
 - `HF_TOKEN` set in `.env` (see [Environment Setup](#7-environment-setup))
 
 ### Full local build in three commands
 
 ```bash
-# 1. Pull the team's Bronze data from HuggingFace
-./venv/bin/python -m data_ingestion.sync_bronze --source all
+# 1. Pull Bronze data from HuggingFace
+./env/bin/python -m data_ingestion.sync_bronze --source all
 
 # 2. Build Silver from local Bronze (no network)
-./venv/bin/python -m data_ingestion.silver --source all
+./env/bin/python -m data_ingestion.silver --source all
 
 # 3. Build Gold from local Silver (no network) — day-ahead (24h horizon)
-./venv/bin/python -m data_ingestion.gold
+./env/bin/python -m data_ingestion.gold
 ```
 
 The Gold feature table is written to `data/gold/gold_features/year=YYYY/month=MM/`.
 
 ### Skip rebuilding — pull pre-built data directly
 
-If you only need the data and do not want to recompute it, pull Silver and Gold directly from the team HuggingFace repos:
+If you only need the data and do not want to recompute it, pull Silver and Gold directly from the HuggingFace repos:
 
 ```bash
-# Log in once (needed for private team repos)
-./venv/bin/hf auth login
+# Log in once (needed for private repos)
+./env/bin/hf auth login
 # or append --token <your_hf_token> to each command below
 
 # Pull Silver
-./venv/bin/hf download gridsight-team/gridsight-silver \
+./env/bin/hf download Masonhoang1107/gridsight-silver \
     --repo-type dataset --local-dir data/silver
 
 # Pull Gold
-./venv/bin/hf download gridsight-team/gridsight-gold \
+./env/bin/hf download Masonhoang1107/gridsight-gold \
     --repo-type dataset --local-dir data/gold
 ```
 
@@ -161,51 +240,51 @@ Bronze does one job: download the raw data and save it to parquet. No cleaning, 
 #### Ingest all sources for specific years
 
 ```bash
-./venv/bin/python -m bronze --source all --years 2021 2022 2023 2024
+./env/bin/python -m bronze --source all --years 2021 2022 2023 2024
 ```
 
 #### Ingest a single source
 
 ```bash
-./venv/bin/python -m bronze --source pv_live      --years 2021 2022 2023 2024
-./venv/bin/python -m bronze --source neso         --years 2021 2022 2023 2024
-./venv/bin/python -m bronze --source ocf_pv       --years 2021 2022 2023 2024
-./venv/bin/python -m bronze --source met_office_nwp --years 2021 2022 2023 2024 --hours 0 12
+./env/bin/python -m bronze --source pv_live      --years 2021 2022 2023 2024
+./env/bin/python -m bronze --source neso         --years 2021 2022 2023 2024
+./env/bin/python -m bronze --source ocf_pv       --years 2021 2022 2023 2024
+./env/bin/python -m bronze --source met_office_nwp --years 2021 2022 2023 2024 --hours 0 12
 ```
 
 #### Met Office NWP — additional options
 
 ```bash
 # Only 00Z and 12Z init-times (recommended — covers day-ahead horizon)
-./venv/bin/python -m bronze --source met_office_nwp --years 2023 2024 --hours 0 12
+./env/bin/python -m bronze --source met_office_nwp --years 2023 2024 --hours 0 12
 
 # All 24 init-times per day (large — use for research only)
-./venv/bin/python -m bronze --source met_office_nwp --years 2023 2024 --hours -1
+./env/bin/python -m bronze --source met_office_nwp --years 2023 2024 --hours -1
 
 # Parallel workers (default 4)
-./venv/bin/python -m bronze --source met_office_nwp --years 2023 2024 --workers 8
+./env/bin/python -m bronze --source met_office_nwp --years 2023 2024 --workers 8
 
 # Re-extract files that already exist
-./venv/bin/python -m bronze --source met_office_nwp --years 2023 2024 --overwrite
+./env/bin/python -m bronze --source met_office_nwp --years 2023 2024 --overwrite
 ```
 
 #### NESO — additional options
 
 ```bash
 # Specific CKAN package IDs
-./venv/bin/python -m bronze --source neso --packages embedded-wind-and-solar-forecasts
+./env/bin/python -m bronze --source neso --packages embedded-wind-and-solar-forecasts
 
 # Force re-download even if last_modified is unchanged
-./venv/bin/python -m bronze --source neso --force-refresh
+./env/bin/python -m bronze --source neso --force-refresh
 
 # Cap rows per resource (for dev/testing)
-./venv/bin/python -m bronze --source neso --max-records 10000
+./env/bin/python -m bronze --source neso --max-records 10000
 ```
 
-#### Upload Bronze to the team HF repo after ingestion
+#### Upload Bronze to the HF repo after ingestion
 
 ```bash
-./venv/bin/python -m bronze --source all --years 2021 2022 2023 2024 --upload
+./env/bin/python -m bronze --source all --years 2021 2022 2023 2024 --upload
 ```
 
 #### Output structure
@@ -233,30 +312,30 @@ Silver reads local Bronze and applies four deterministic cleaning rules to every
 #### Build all Silver tables
 
 ```bash
-./venv/bin/python -m data_ingestion.silver --source all
+./env/bin/python -m data_ingestion.silver --source all
 ```
 
 #### Build a single table
 
 ```bash
-./venv/bin/python -m data_ingestion.silver --source pv_live
-./venv/bin/python -m data_ingestion.silver --source met_office_nwp
-./venv/bin/python -m data_ingestion.silver --source ocf_pv
-./venv/bin/python -m data_ingestion.silver --source neso
+./env/bin/python -m data_ingestion.silver --source pv_live
+./env/bin/python -m data_ingestion.silver --source met_office_nwp
+./env/bin/python -m data_ingestion.silver --source ocf_pv
+./env/bin/python -m data_ingestion.silver --source neso
 ```
 
 #### Cross-source sanity checks
 
 ```bash
-./venv/bin/python -m data_ingestion.silver --source cross_check
+./env/bin/python -m data_ingestion.silver --source cross_check
 ```
 
 Checks that the correlation between `pv_live.generation_mw` and `neso.embedded_solar_mw` is > 0.85 — a sanity check that both sources are measuring the same physical quantity.
 
-#### Push Silver to the team HF repo
+#### Push Silver to the HF repo
 
 ```bash
-./venv/bin/python -c "from data_ingestion.silver import upload_silver_to_hf; upload_silver_to_hf()"
+./env/bin/python -c "from data_ingestion.silver import upload_silver_to_hf; upload_silver_to_hf()"
 ```
 
 #### Cleaning rules applied to every source
@@ -296,25 +375,25 @@ Gold reads local Silver and produces the final feature table. The entire build i
 #### Build for day-ahead forecasting (horizon = 48 steps = 24h) — default
 
 ```bash
-./venv/bin/python -m data_ingestion.gold
+./env/bin/python -m data_ingestion.gold
 ```
 
 #### Build for 3-hour-ahead forecasting (horizon = 6 steps)
 
 ```bash
-./venv/bin/python -m data_ingestion.gold --horizon-steps 6
+./env/bin/python -m data_ingestion.gold --horizon-steps 6
 ```
 
-#### Build and push to team HF repo in one command
+#### Build and push to the HF repo in one command
 
 ```bash
-./venv/bin/python -m data_ingestion.gold --upload
+./env/bin/python -m data_ingestion.gold --upload
 ```
 
-#### Push Gold to team HF repo separately
+#### Push Gold to the HF repo separately
 
 ```bash
-./venv/bin/python -m data_ingestion.gold --upload
+./env/bin/python -m data_ingestion.gold --upload
 ```
 
 #### Build steps
@@ -438,22 +517,22 @@ For `horizon=48` (day-ahead), all lags are ≥ 48 steps (≥ 24 hours ago).
 
 ---
 
-## 6. Team HuggingFace Repositories
+## 6. HuggingFace Repositories
 
 | Layer | HF Dataset Repo | Purpose |
 |---|---|---|
-| Bronze | `gridsight-team/gridsight-bronze` | Raw immutable downloads, shared across team |
-| Silver | `gridsight-team/gridsight-silver` | Cleaned, validated, UTC-aligned tables |
-| Gold | `gridsight-team/gridsight-gold` | Model-ready feature store |
+| Bronze | `Masonhoang1107/gridsight-bronze` | Raw immutable downloads |
+| Silver | `Masonhoang1107/gridsight-silver` | Cleaned, validated, UTC-aligned tables |
+| Gold | `Masonhoang1107/gridsight-gold` | Model-ready feature store |
 
-### Sync Bronze from the team repo (recommended first step)
+### Sync Bronze from HuggingFace (recommended first step)
 
 ```bash
 # All sources
-./venv/bin/python -m data_ingestion.sync_bronze --source all
+./env/bin/python -m data_ingestion.sync_bronze --source all
 
 # Single source
-./venv/bin/python -m data_ingestion.sync_bronze --source met_office_nwp
+./env/bin/python -m data_ingestion.sync_bronze --source met_office_nwp
 ```
 
 The sync is incremental and resumable — files already present locally are skipped.
@@ -465,16 +544,16 @@ The sync is incremental and resumable — files already present locally are skip
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/Group-4-DS-Professional-Team-Project/Week-04-Team-4.git
-cd Week-04-Team-4
+git clone https://github.com/hoangdatkt1107/GridSight_UK.git
+cd GridSight_UK
 ```
 
 ### 2. Create a virtual environment and install dependencies
 
 ```bash
-python -m venv venv
-source venv/bin/activate        # macOS / Linux
-# venv\Scripts\activate.bat     # Windows
+python -m venv env
+source env/bin/activate         # macOS / Linux
+# env\Scripts\activate.bat      # Windows
 
 pip install -r requirements.txt
 ```
@@ -488,7 +567,7 @@ Create a `.env` file in the project root (already git-ignored):
 HF_TOKEN="hf_your_token_here"
 ```
 
-You can generate a token at [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens). The token needs **read** access to the `gridsight-team` private repos.
+You can generate a token at [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens). The token needs **read** access to the `Masonhoang1107` dataset repos.
 
 ### 4. Verify installation
 
@@ -521,41 +600,3 @@ pip install lightgbm optuna                      # LGBM-Q HPO
 pip install pvlib holidays                       # Solar geometry, UK holidays
 pip install peft transformers accelerate         # Chronos + LoRA fine-tuning
 ```
-
----
-
-## 8. Week 04 Deliverables
-
-### Documents (`Documents/Project Plan/`)
-
-| Document | Description |
-|---|---|
-| Data Management Plan | Data sources, storage strategy, Bronze → Silver → Gold pipeline, DVC/HF tracking |
-| Project Pipeline | Full end-to-end pipeline workflow: ingestion → EDA → modelling → dashboard |
-| Project Specifications | Research questions, objectives, KPI targets, model families |
-| Project Timeline | Week-by-week milestone plan |
-| Quality Assurance & Test Plan | Data contracts, model evaluation framework, KPI gates |
-| Team Plan | Role allocation, communication protocols, sprint planning |
-| Week-4-Scrum-Meeting-Note-Team-4.pdf | Sprint review, retrospective, and Week 5 planning notes |
-
-### Code (`Code/`)
-
-This week delivers the complete **Bronze → Silver → Gold** data pipeline:
-
-- `bronze/` — four data source ingestors (`neso.py`, `pv_live.py`, `ocf_pv.py`, `met_office.py`) with parallel download, incremental caching, and HF upload
-- `silver/` — four cleaned tables with UTC alignment, range validation, anti-leakage guards, and data-quality contracts
-- `gold/` — leakage-safe feature store with calendar, solar geometry, and lagged features; parameterised by forecast horizon; anti-leakage contracts enforced at build time
-- `sync_bronze.py` — utility to pull the shared team Bronze from HuggingFace
-
----
-
-## Notes
-
-- **Do not commit `.env`** — the HF token is in `.gitignore`
-- **Gold is rebuildable from Silver in under 2 minutes** — no need to store it in git
-- **Bronze is the only layer that requires network access** — Silver and Gold build entirely from local files
-- The `_state.json` file in each NESO package folder is an incremental cache of `last_modified` timestamps — delete it to force a full re-download
-
----
-
-# GridSight_UK
