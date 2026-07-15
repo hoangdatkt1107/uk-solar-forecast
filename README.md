@@ -2,8 +2,6 @@
 
 **AI-Based Solar Energy Forecasting for the UK National Grid**
 
-> MSc Data Science · Professional Team Project · 2025/2026
-
 ---
 
 ## Table of Contents
@@ -35,57 +33,55 @@ GridSight UK is a probabilistic solar power generation forecasting system for th
 
 Three model families are compared: **LSTM-Q** (deep learning), **TCN-Q + LGBM-Q + Linear-Q stack** (physics-ML hybrid), and **Chronos + LoRA** (foundation model fine-tuning).
 
+**Live deployment:** the stack model is served on Azure Container Apps — an hourly job
+refreshes bronze, rebuilds features and writes the next-12h forecast, which a FastAPI app
+and a static dashboard read. The heavy weekly retrain runs on GitHub Actions and pushes the
+promoted model to HuggingFace. See [`deploy/README.md`](deploy/README.md) for the full cloud
+architecture, the 4 GiB serve tuning, and the retrain workflow.
+
 ---
 
 ## 2. Repository Structure
 
 ```
-Week-04-Team-4/
+gridsight-uk-2026/
 │
-├── Code/
-│   ├── bronze/                  # Raw data ingestion (download only)
-│   │   ├── cli.py               # CLI entrypoint: python -m bronze
-│   │   ├── common.py            # Shared config, path helpers
-│   │   ├── neso.py              # NESO CKAN API → parquet
-│   │   ├── pv_live.py           # Sheffield PV_Live API → parquet
-│   │   ├── ocf_pv.py            # OCF UK PV (HuggingFace) → parquet
-│   │   ├── met_office.py        # Met Office NWP zarr → point-extract parquet
-│   │   └── upload.py            # Push local Bronze to HF repo
-│   │
-│   ├── silver/                  # Cleaning, alignment, quality checks
-│   │   ├── cli.py               # CLI entrypoint: python -m silver
-│   │   ├── common.py            # Shared UTC helpers, IO, missing-data policy
-│   │   ├── contracts.py         # Data-quality assertions (hard-fail on violation)
-│   │   ├── pv_live.py           # → silver_pv_live  (the model target)
-│   │   ├── met_office.py        # → silver_met_office_nwp
-│   │   ├── ocf_pv.py            # → silver_ocf_pv
-│   │   ├── neso.py              # → silver_neso
-│   │   └── upload.py            # Push local Silver to HF repo
-│   │
-│   ├── gold/                    # Feature engineering (model-ready table)
-│   │   ├── build.py             # Orchestrator: merge → targets → features → validate
-│   │   ├── merge.py             # LEFT JOIN 4 Silver tables on timestamp_utc
-│   │   ├── targets.py           # target_mw, target_cf
-│   │   ├── calendar_features.py # Calendar + NOAA solar geometry
-│   │   ├── lag_features.py      # Leakage-safe lags & rolling stats
-│   │   ├── contracts.py         # Anti-leakage hard checks
-│   │   ├── common.py            # Shared config, read/write gold
-│   │   └── upload.py            # Push local Gold to HF repo
-│   │
+├── data_ingestion/              # Bronze → Silver → Gold data pipeline
+│   ├── bronze/                  # Raw ingestion (NESO, PV_Live, OCF, Met Office AWS) → parquet + HF upload
+│   ├── silver/                  # Clean / align / quality-check each source (neso.py builds per-file, memory-safe)
+│   ├── gold/                    # Feature engineering → model-ready table (merge, targets, calendar, lags)
 │   └── sync_bronze.py           # Pull team Bronze from HF → local data/bronze/
 │
-├── Documents/
-│   └── Project Plan/
-│       ├── Data Management Plan (Group 4).pdf
-│       ├── Project Pipeline (Group 4).pdf
-│       ├── Project Specifications (Group 4).pdf
-│       ├── Project Timeline (Group 4).pdf
-│       ├── Quality Assurance & Test Plan (Group 4).pdf
-│       └── Team Plan (Group 4).pdf
+├── modeling/                    # Models, training, live serving
+│   ├── config.py                # ModelConfig — rolling val/test split, horizons, hyperparams
+│   ├── data.py                  # Gold loader + split_masks (rolling or pinned dates)
+│   ├── train.py                 # TCN-Q + LGBM-Q + Linear-Q stack training
+│   ├── serve.py / predict.py    # Build gold + forecast the next horizon
+│   ├── registry.py              # HF model registry — pull live model / promote a retrain
+│   └── evaluate.py · metrics.py · clearsky.py · stacking.py · chronos_baseline.py · cli.py
 │
-├── requirements.txt
+├── serving/
+│   └── api.py                   # FastAPI — reads forecast JSON, serves /forecast + /health
+│
+├── frontend/                    # Vanilla dashboard (Azure Static Web Apps)
+│   ├── index.html               # History explorer + live next-12h overlay
+│   ├── build_history.py         # Generates history.json (2-year backtest)
+│   └── staticwebapp.config.json
+│
+├── deploy/                      # Azure Container Apps deploy — see deploy/README.md
+│   ├── bicep/main.bicep         # API + serve job + Key Vault + storage + managed identity
+│   ├── Dockerfile.api · Dockerfile.job
+│   └── scripts/                 # deploy.sh, run_serve_now.sh, deploy_frontend.sh, config.env
+│
+├── .github/workflows/
+│   └── retrain.yml              # Weekly retrain on GitHub Actions → push model to HF
+│
+├── pipeline.py                  # Cloud entrypoint: `python pipeline.py serve | retrain`
+├── src/gridsight/               # Shared settings/config
+├── configs/
+├── requirements.txt · requirements-api.txt · requirements-job.txt
 ├── .env                         # HF_TOKEN (git-ignored)
-└── README.md
+└── README.md · deploy/README.md
 ```
 
 ---
@@ -562,5 +558,4 @@ This week delivers the complete **Bronze → Silver → Gold** data pipeline:
 
 ---
 
-*GridSight UK · Group 4 · MSc Data Science · University of Hertfordshire · 2025/2026*
 # GridSight_UK
