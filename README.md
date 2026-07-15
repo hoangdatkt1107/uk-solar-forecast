@@ -24,14 +24,13 @@ A personal project by **Tien Dat Hoang** · [live dashboard](https://orange-mush
 
 ## 1. Project Overview
 
-GridSight UK is a probabilistic solar power generation forecasting system for the UK national grid. It produces calibrated 80% prediction intervals (q10 / q50 / q90) across four forecast horizons:
+GridSight UK is a probabilistic solar power generation forecasting system for the UK national grid. It produces calibrated 80% prediction intervals (q10 / q50 / q90) across two forecast horizons:
 
 | Horizon | Steps | Use case |
 |---|---|---|
-| 30-minute ahead | 1 step | Near-real-time balancing |
-| 3-hour ahead | 6 steps | Intra-day trading |
-| 24-hour ahead | 48 steps | Day-ahead market (primary target) |
-| 48-hour ahead | 96 steps | Forward planning |
+| 6-hour ahead | 12 steps | Intra-day trading |
+| 12-hour ahead | 24 steps | Half-day-ahead market (primary target) |
+
 
 Three model families are compared: **LSTM-Q** (deep learning), **TCN-Q + LGBM-Q + Linear-Q stack** (physics-ML hybrid), and **Chronos + LoRA** (foundation model fine-tuning).
 
@@ -71,7 +70,7 @@ different infrastructure (see [why](#why-it-is-deployed-this-way)).
    ║     │Azure File│  share "serve"    ║              ║  weekly-retrain (cron Sun 3am)║
    ║     └────┬─────┘                   ║              ║  free runner · 16 GB RAM      ║
    ║          │ reads                   ║              ║   full history → gold → train ║
-   ║  ┌───────▼────────┐                ║              ║   → promote model ────────────╫──┘
+   ║  ┌───────▼────────┐                ║              ║   → promote model             ╫
    ║  │ Container App  │ FastAPI, 24/7  ║              ║                               ║
    ║  │ gridsight-api  │ 0.25 vCPU      ║              ╚═══════════════════════════════╝
    ║  └───────┬────────┘                ║
