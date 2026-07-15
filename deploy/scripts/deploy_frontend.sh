@@ -30,8 +30,26 @@ if [ -n "$API_URL" ]; then
     "$BUILD_DIR/index.html" && rm -f "$BUILD_DIR/index.html.bak"
 fi
 
-echo "==> Creating Static Web App (Free) if needed: $SWA_NAME"
-az staticwebapp create -n "$SWA_NAME" -g "$RG" -l "$LOCATION" --sku Free -o none 2>/dev/null || true
+# Static Web Apps only exists in a few regions (centralus, eastus2, westus2, westeurope,
+# eastasia) — NOT spaincentral, where the rest of the stack lives. It's a global CDN, so the
+# region only decides where the app's metadata sits; westeurope is closest to the UK.
+SWA_LOCATION="${SWA_LOCATION:-westeurope}"
+
+# Static Web Apps needs the Microsoft.Web provider; deploy.sh doesn't register it (the API
+# and jobs use Microsoft.App instead), so a fresh subscription fails here without this.
+if [ "$(az provider show -n Microsoft.Web --query registrationState -o tsv 2>/dev/null)" != "Registered" ]; then
+  echo "==> Registering resource provider Microsoft.Web (first time only)"
+  az provider register --namespace Microsoft.Web --wait -o none
+fi
+
+echo "==> Creating Static Web App (Free) if needed: $SWA_NAME ($SWA_LOCATION)"
+if az staticwebapp show -n "$SWA_NAME" -g "$RG" -o none 2>/dev/null; then
+  echo "    exists, reusing"
+else
+  # don't swallow errors here — a failed create used to surface later as a confusing
+  # "ResourceNotFound" on the secrets call
+  az staticwebapp create -n "$SWA_NAME" -g "$RG" -l "$SWA_LOCATION" --sku Free -o none
+fi
 TOKEN="$(az staticwebapp secrets list -n "$SWA_NAME" -g "$RG" --query properties.apiKey -o tsv)"
 
 echo "==> Deploying content"
