@@ -448,32 +448,67 @@ function mark(){
   document.querySelectorAll("[data-tf]").forEach(b=>b.classList.toggle("on",+b.dataset.tf===winPts));
 }
 
-// ---- live overlay (real next-12h forecast from the API, appended at the edge) ----
+// ---- live overlay ---------------------------------------------------------------------
+// history.json is a static 2-year backtest: it only moves when it is rebuilt by hand, so
+// its `actual` freezes at the last rebuild and drifts further behind every hour. The hourly
+// serve job publishes two windows that close that gap:
+//   /recent   — last N days of actual + NESO + what the model said  -> fills history..now
+//   /forecast — the next horizon                                    -> the LIVE region
 function _grow(s,N){const g=(a,f)=>{while(a.length<N)a.push(f);};
   g(s.actual,null);g(s.neso,null);g(s.ssrd,null);g(s.cloud,null);g(s.temp,null);g(s.wind,null);g(s.day,0);
   for(const m in s.models){g(s.models[m].q10,null);g(s.models[m].q50,null);g(s.models[m].q90,null);}
   s.n=N;}
 
+const _idx=(s,ts)=>Math.round((Date.parse(ts)-Date.parse(s.start))/(s.step_min*60000));
+
+async function _get(url){
+  try{const r=await fetch(url,{cache:"no-store"}); if(!r.ok) return null; return await r.json();}
+  catch(_){return null;}
+}
+
+// Merge API records in at their true index. Only touches i >= fromIdx, so the backtest
+// already in history.json is never overwritten. Returns the highest index seen.
+function _mergeRecs(s,q,recs,fromIdx){
+  let maxI=-1;
+  recs.forEach(r=>{const i=_idx(s,r.timestamp_utc); if(i>maxI)maxI=i;});
+  if(maxI<fromIdx) return -1;                              // nothing newer than history
+  if(maxI+1>s.n) _grow(s,maxI+1);
+  recs.forEach(r=>{
+    const i=_idx(s,r.timestamp_utc); if(i<fromIdx||i>=s.n) return;
+    if(r.q10!=null)q.q10[i]=r.q10; if(r.q50!=null)q.q50[i]=r.q50; if(r.q90!=null)q.q90[i]=r.q90;
+    if(r.actual!=null)s.actual[i]=r.actual;                // the whole point of /recent
+    if(r.neso!=null)s.neso[i]=r.neso;
+    if(r.ssrd!=null)s.ssrd[i]=r.ssrd;
+    if(r.tcc!=null)s.cloud[i]=r.tcc*100;
+    if(r.t2m!=null)s.temp[i]=r.t2m-273.15;
+    if(r.ws10!=null)s.wind[i]=r.ws10*10;
+    s.day[i]=(r.ssrd!=null&&r.ssrd>1)?1:0;
+  });
+  return maxI;
+}
+
 async function ensureLive(hz,model){
   if(!API_BASE) return false;
   const s=HIST.series[hz], q=s.models[model];
-  if(q._live) return false;                               // already merged
-  let recs;
-  try{const r=await fetch(`${API_BASE}/forecast?model=${model}&horizon=${hz}`,{cache:"no-store"});
-    if(!r.ok) return false; recs=(await r.json()).forecast;}catch(_){return false;}
-  if(!recs||!recs.length) return false;
-  const st=Date.parse(s.start), sp=s.step_min*60000, oldN=s.n;
-  let maxI=oldN-1; recs.forEach(r=>{const i=Math.round((Date.parse(r.timestamp_utc)-st)/sp); if(i>maxI)maxI=i;});
-  if(maxI<oldN){q._live=true; return false;}              // API not ahead of history (stale) — nothing to append
-  _grow(s,maxI+1);
-  const w=!s._liveW;                                       // fill shared weather/neso once per horizon
-  recs.forEach(r=>{const i=Math.round((Date.parse(r.timestamp_utc)-st)/sp); if(i<oldN||i>=s.n)return;
-    if(r.q10!=null)q.q10[i]=r.q10; if(r.q50!=null)q.q50[i]=r.q50; if(r.q90!=null)q.q90[i]=r.q90;
-    if(w){ if(r.neso!=null)s.neso[i]=r.neso; if(r.ssrd!=null)s.ssrd[i]=r.ssrd;
-      if(r.tcc!=null)s.cloud[i]=r.tcc*100; if(r.t2m!=null)s.temp[i]=r.t2m-273.15; if(r.ws10!=null)s.wind[i]=r.ws10*10;
-      s.day[i]=(r.ssrd!=null&&r.ssrd>1)?1:0; }});
-  s._liveW=true; q._live=true; s.liveFrom=oldN;
-  return true;
+  if(q._live) return false;                                // one attempt per model/horizon
+  const oldN=s.n;
+  const [rec,fc]=await Promise.all([
+    _get(`${API_BASE}/recent?model=${model}&horizon=${hz}`),
+    _get(`${API_BASE}/forecast?model=${model}&horizon=${hz}`),
+  ]);
+  if(!rec&&!fc) return false;                              // API unreachable — allow a retry
+  q._live=true;
+  let changed=false;
+  // 1) close the gap between the end of the static history and now, with real actuals
+  if(rec&&rec.recent&&rec.recent.length&&_mergeRecs(s,q,rec.recent,oldN)>=oldN) changed=true;
+  // 2) append the forecast. The LIVE band starts where the forecast starts — not where
+  //    history ended — because everything before that is observed, not predicted.
+  if(fc&&fc.forecast&&fc.forecast.length&&_mergeRecs(s,q,fc.forecast,oldN)>=oldN){
+    changed=true;
+    const li=_idx(s,fc.generated_at);
+    s.liveFrom=(li>oldN)?li:oldN;
+  }
+  return changed;
 }
 
 // ---- boot ---------------------------------------------------------------------

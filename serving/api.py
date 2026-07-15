@@ -57,3 +57,17 @@ def forecast(horizon: str = "12h", model: str = "stack"):
             return json.loads(f.read_text())
     raise HTTPException(404, f"no forecast for model={model} horizon={horizon}; "
                              f"run the serve job (`python pipeline.py serve`)")
+
+
+@app.get("/recent")
+def recent(horizon: str = "12h", model: str = "stack"):
+    """The last N days of actual / NESO / model output, refreshed by the hourly serve job.
+
+    history.json is a static backtest that only moves when it is rebuilt by hand, so the
+    dashboard reads this to keep its `actual` line current in between.
+    """
+    f = SERVE_DIR / f"recent_{model}_{horizon}.json"
+    if f.exists():
+        return json.loads(f.read_text())
+    raise HTTPException(404, f"no recent window for model={model} horizon={horizon}; "
+                             f"run the serve job (`python pipeline.py serve`)")
