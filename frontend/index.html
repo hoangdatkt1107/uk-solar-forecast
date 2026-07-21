@@ -10,6 +10,7 @@
     --hair:#e8e8e2; --hair-2:#f0f0ec;
     --amber:#c98a25; --amber-band:rgba(201,138,37,.12);
     --teal:#2f6f62; --neso:#c1c5cb; --night:rgba(30,36,44,.045);
+    --trend:#7a6cd6;
     --sans:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
     --mono:ui-monospace,"SF Mono","Cascadia Code",Menlo,Consolas,monospace;
   }
@@ -17,34 +18,34 @@
   html,body{margin:0}
   body{background:var(--paper); color:var(--ink); font-family:var(--sans);
     font-size:15px; line-height:1.5; -webkit-font-smoothing:antialiased; min-height:100vh}
-  .wrap{max-width:1400px; margin:0 auto; padding:38px clamp(18px,4vw,40px) 60px}
+  .wrap{max-width:1400px; margin:0 auto; padding:16px clamp(18px,4vw,40px) 20px}
   .lab{font-size:10.5px; letter-spacing:.16em; text-transform:uppercase; color:var(--muted)}
   .num{font-family:var(--mono); font-variant-numeric:tabular-nums}
 
   header{display:flex; justify-content:space-between; align-items:flex-start;
-    gap:24px; flex-wrap:wrap; padding-bottom:20px; border-bottom:1px solid var(--hair)}
+    gap:24px; flex-wrap:wrap; padding-bottom:8px; border-bottom:1px solid var(--hair)}
   .title{display:flex; align-items:baseline; gap:11px}
-  .title h1{font-size:28px; font-weight:600; letter-spacing:-.015em; margin:0; color:var(--ink)}
+  .title h1{font-size:24px; font-weight:600; letter-spacing:-.015em; margin:0; color:var(--ink)}
   .title .dot{width:9px; height:9px; border-radius:50%; background:var(--amber); transform:translateY(-2px)}
   .title .sub{display:block; color:var(--muted); font-size:13px; margin-top:3px}
   .title .sub b{color:var(--ink); font-weight:600}
   .issued{text-align:right; color:var(--muted); font-size:12.5px}
   .issued .num{color:var(--ink); font-size:14px}
 
-  .main{display:grid; grid-template-columns:minmax(0,1fr) 322px; gap:24px; margin-top:22px; align-items:start}
+  .main{display:grid; grid-template-columns:minmax(0,1fr) 322px; gap:24px; margin-top:6px; align-items:start}
 
-  .stats{display:flex; gap:34px; flex-wrap:wrap; padding:2px 2px 20px}
-  .stat .v{font-family:var(--mono); font-variant-numeric:tabular-nums; font-size:26px;
-    font-weight:500; margin-top:5px; letter-spacing:-.01em}
+  .stats{display:flex; gap:30px; flex-wrap:wrap; padding:2px 2px 2px}
+  .stat .v{font-family:var(--mono); font-variant-numeric:tabular-nums; font-size:22px;
+    font-weight:500; margin-top:3px; letter-spacing:-.01em}
   .stat .v small{font-size:12px; color:var(--muted); font-weight:400; font-family:var(--sans)}
   .stat.good .v{color:var(--teal)} .stat.bad .v{color:var(--amber)}
 
-  .controls{display:flex; gap:14px 22px; flex-wrap:wrap; align-items:center; padding-bottom:15px}
-  .ctl{display:flex; align-items:center; gap:9px}
+  .controls{display:flex; gap:10px 16px; flex-wrap:wrap; align-items:center; padding-bottom:6px}
+  .ctl{display:flex; align-items:center; gap:6px}
   .spacer{flex:1}
   .seg{display:inline-flex; gap:2px; border:1px solid var(--hair); border-radius:8px; padding:2px; background:var(--card)}
   .seg button{border:none; background:none; font:inherit; font-size:12.5px; color:var(--muted);
-    padding:5px 12px; border-radius:6px; cursor:pointer; letter-spacing:.01em; transition:color .15s}
+    padding:5px 9px; border-radius:6px; cursor:pointer; letter-spacing:.01em; transition:color .15s}
   .seg button:hover{color:var(--ink)}
   .seg button.on{background:var(--paper); color:var(--ink); box-shadow:inset 0 0 0 1px var(--hair)}
   .nav{display:inline-flex; gap:4px}
@@ -54,8 +55,8 @@
   .nav button.wide{width:auto; padding:0 11px; font-size:11px; letter-spacing:.04em; text-transform:uppercase}
 
   .card{background:var(--card); border:1px solid var(--hair); border-radius:9px}
-  .chart{padding:18px 16px 10px}
-  .chart-head{display:flex; justify-content:space-between; align-items:baseline; padding:0 4px 8px; gap:14px; flex-wrap:wrap}
+  .chart{padding:8px 14px 4px}
+  .chart-head{display:flex; justify-content:space-between; align-items:baseline; padding:0 4px 6px; gap:14px; flex-wrap:wrap}
   .legend{display:flex; gap:16px; font-size:12px; color:var(--muted)}
   .legend span{display:inline-flex; align-items:center; gap:7px}
   .sw{width:15px; height:2px; border-radius:2px; background:currentColor}
@@ -67,27 +68,39 @@
   .q50{fill:none; stroke:var(--amber); stroke-width:2.2; stroke-linejoin:round; stroke-linecap:round}
   .actual{fill:none; stroke:var(--teal); stroke-width:1.7; stroke-linejoin:round; stroke-linecap:round}
   .neso{fill:none; stroke:var(--neso); stroke-width:1.5; stroke-dasharray:2 4; stroke-linecap:round}
+  .trend{fill:none; stroke:var(--trend); stroke-width:2.6; opacity:.5; stroke-linejoin:round; stroke-linecap:round}
+  .vbox-bg{fill:rgba(255,255,255,.94); stroke:var(--hair)}
   .band{fill:var(--amber-band)} .night{fill:var(--night)}
   .cross{stroke:var(--ink); stroke-width:1; opacity:.18}
   .live-bg{fill:rgba(201,138,37,.05)}
   .now-line{stroke:var(--amber); stroke-width:1; stroke-dasharray:3 3; opacity:.55}
+  .insample-bg{fill:rgba(90,100,120,.07)}
+  .oos-line{stroke:var(--ink); stroke-width:1; stroke-dasharray:4 3; opacity:.4}
+  svg.plot text.ooslabel{fill:var(--muted); font-size:10px; letter-spacing:.05em}
   svg.plot text.livetag{fill:var(--amber); font-size:10px; letter-spacing:.08em}
   .dot{fill:var(--amber); stroke:var(--card); stroke-width:2.5} .dot.a{fill:var(--teal)}
 
-  .readout{margin-top:16px; padding:18px 20px}
-  .rd-grid{display:grid; grid-template-columns:1.3fr 1fr 1fr; gap:26px; align-items:start}
-  .wx{display:grid; grid-template-columns:repeat(4,1fr); gap:22px; margin-top:16px; padding-top:15px; border-top:1px solid var(--hair)}
-  .wx .item .v{font-family:var(--mono); font-variant-numeric:tabular-nums; font-size:19px; font-weight:500; margin:4px 0 2px}
-  .rd .lab{margin-bottom:6px}
-  .rd .big{font-family:var(--mono); font-variant-numeric:tabular-nums; font-size:30px;
+  .readout{margin-top:10px; padding:6px 18px}
+  .rd-head{display:flex; justify-content:space-between; align-items:center; gap:12px;
+    margin-bottom:5px; padding-bottom:6px; border-bottom:1px solid var(--hair)}
+  .rd-when{font-family:var(--mono); font-variant-numeric:tabular-nums; font-size:16px;
+    color:var(--ink); letter-spacing:.01em}
+  .cond{display:inline-flex; align-items:center; gap:7px; font-size:12.5px; color:var(--ink);
+    padding:3px 11px; border:1px solid var(--hair); border-radius:999px; background:var(--paper); white-space:nowrap}
+  .cond .cdot{width:8px; height:8px; border-radius:50%; background:var(--faint); flex:none}
+  .rd-grid{display:grid; grid-template-columns:1.3fr 1fr 1fr; gap:24px; align-items:start}
+  .wx{display:grid; grid-template-columns:repeat(4,1fr); gap:22px; margin-top:5px; padding-top:5px; border-top:1px solid var(--hair)}
+  .wx .item .v{font-family:var(--mono); font-variant-numeric:tabular-nums; font-size:16px; font-weight:500; margin:3px 0 1px}
+  .rd .lab{margin-bottom:5px}
+  .rd .big{font-family:var(--mono); font-variant-numeric:tabular-nums; font-size:25px;
     font-weight:500; letter-spacing:-.02em; line-height:1.05}
   .rd .big small{font-size:12px; color:var(--muted); font-weight:400; letter-spacing:0}
   .rd .v{font-family:var(--mono); font-variant-numeric:tabular-nums; font-size:21px; font-weight:500; margin-top:1px}
   .rd .v.tl{color:var(--teal)} .rd .v.am{color:var(--amber)}
   .rd .sub{font-size:12px; color:var(--muted); margin-top:3px}
-  .verdict{margin-top:18px; padding-top:15px; border-top:1px solid var(--hair); font-size:13.5px; color:var(--ink)}
+  .verdict{margin-top:6px; padding-top:5px; border-top:1px solid var(--hair); font-size:12.5px; color:var(--ink)}
   .verdict b{font-family:var(--mono); font-weight:500} .verdict .g{color:var(--teal)} .verdict .a{color:var(--amber)}
-  .hint{color:var(--faint); font-size:12px; margin-top:7px}
+  .hint{color:var(--faint); font-size:11px; margin-top:5px}
 
   /* sidebar */
   aside{position:sticky; top:20px}
@@ -109,15 +122,77 @@
   .src b{display:block; color:var(--ink); font-weight:600; font-size:13px}
   .src span{color:var(--muted)}
 
-  footer{display:flex; justify-content:space-between; gap:16px; flex-wrap:wrap; margin-top:24px; font-size:12px; color:var(--faint)}
+  footer{display:flex; justify-content:space-between; gap:16px; flex-wrap:wrap; margin-top:2px; font-size:12px; color:var(--faint)}
   footer b{color:var(--muted); font-weight:500}
   :focus-visible{outline:2px solid var(--amber); outline-offset:3px; border-radius:3px}
   .plot:focus{outline:none}
   .plot:focus-visible{outline:1px solid var(--faint); outline-offset:5px; border-radius:6px}
 
+  /* view toggle */
+  .viewbar{display:flex; align-items:center; gap:16px; margin-top:6px}
+  .viewbar-note{font-size:12px; color:var(--faint)}
+
+  /* performance view */
+  .perf{margin-top:16px}
+  .perf-top{display:flex; justify-content:space-between; align-items:flex-end; gap:20px; flex-wrap:wrap; margin-bottom:16px}
+  .perf-title{font-size:19px; font-weight:600; letter-spacing:-.01em; margin:0}
+  .perf-sub{font-size:12.5px; color:var(--muted); margin:4px 0 0; max-width:640px}
+  .perf-sub b{color:var(--ink)}
+  .perf-ctrls{display:flex; gap:18px; flex-wrap:wrap}
+  .perf-note{display:flex; gap:12px; background:rgba(90,100,120,.06); border:1px solid var(--hair);
+    border-left:3px solid var(--ink); border-radius:8px; padding:12px 15px; margin-bottom:16px; font-size:13px; color:#3f454d; line-height:1.55}
+  .perf-note b{color:var(--ink); font-weight:600}
+  .perf-note .num{font-family:var(--mono)}
+  .perf-note .ico{flex:none; font-size:15px; line-height:1.3}
+  .perf-kpis{display:grid; grid-template-columns:repeat(5,1fr); gap:14px; margin-bottom:16px}
+  .perf-kpi{background:var(--card); border:1px solid var(--hair); border-radius:9px; padding:13px 15px}
+  .perf-kpi.hero{border-color:var(--teal); box-shadow:inset 0 0 0 1px var(--teal)}
+  .perf-kpi.hero .v{color:var(--teal)}
+  .perf-kpi.warn .v{color:var(--amber)}
+  .perf-kpi .v{font-family:var(--mono); font-variant-numeric:tabular-nums; font-size:23px; font-weight:500; letter-spacing:-.01em; margin-top:5px}
+  .perf-kpi .v small{font-size:11px; color:var(--muted); font-weight:400; font-family:var(--sans)}
+  .perf-kpi .v.tl{color:var(--teal)} .perf-kpi .v.am{color:var(--amber)}
+  .perf-kpi .delta{font-size:11.5px; margin-top:4px; font-family:var(--mono)}
+  .perf-kpi .delta.up{color:var(--teal)} .perf-kpi .delta.dn{color:var(--amber)} .perf-kpi .delta.flat{color:var(--faint)}
+
+  .perf-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:16px}
+  .perf-card{padding:16px 18px 15px}
+  .perf-card.span2{grid-column:1/-1}
+  .perf-head{display:flex; justify-content:space-between; align-items:baseline; gap:12px; margin-bottom:12px; flex-wrap:wrap}
+  .perf-unit{color:var(--faint); font-weight:400; letter-spacing:.02em; text-transform:none; font-size:10.5px}
+  .perf-svg{display:block; width:100%; height:auto}
+  .perf-svg text{font-family:var(--mono); fill:var(--faint); font-size:9px}
+  .perf-insight{font-size:12.5px; color:#4a5058; margin:12px 0 0; line-height:1.5}
+  .perf-insight b{color:var(--ink); font-family:var(--mono); font-weight:500}
+  .perf-insight .g{color:var(--teal)} .perf-insight .a{color:var(--amber)}
+
+  [hidden]{display:none!important}
+  #heatmap{overflow-x:auto}
+  .heat-svg{display:block; height:300px; width:auto; max-width:100%; margin:0 auto}
+  .heat-svg text{font-family:var(--mono); fill:var(--faint); font-size:9px}
+  .heat-cell{stroke:var(--card); stroke-width:1}
+  .perf-scale{display:inline-flex; align-items:center; gap:7px; font-size:10px; color:var(--faint); font-family:var(--mono)}
+  .perf-scale i{width:78px; height:9px; border-radius:3px; display:inline-block}
+
+  .perf-tbl{width:100%; border-collapse:collapse; font-size:12.5px; display:table}
+  .perf-tbl .r{display:table-row}
+  .perf-tbl .r.h .c{color:var(--muted); font-size:10px; letter-spacing:.08em; text-transform:uppercase; padding-bottom:6px}
+  .perf-tbl .c{display:table-cell; padding:5px 10px 5px 0; font-family:var(--mono); font-variant-numeric:tabular-nums; text-align:right; white-space:nowrap}
+  .perf-tbl .c:first-child{text-align:left; font-family:var(--sans); color:var(--ink)}
+  .perf-tbl .c.sk{font-weight:500}
+  .perf-tbl .r:not(.h){border-top:1px solid var(--hair-2)}
+
+  .calib-wrap{display:flex; gap:18px; align-items:center}
+  .calib-wrap .perf-svg{max-width:190px}
+  .calib-read{font-size:12.5px; color:#4a5058}
+  .calib-read .big{font-family:var(--mono); font-size:22px; font-weight:500; color:var(--ink); display:block; margin-bottom:2px}
+  .calib-read .lab{margin-top:10px}
+
   @media (max-width:980px){
     .main{grid-template-columns:1fr}
     aside{position:static}
+    .perf-grid{grid-template-columns:1fr}
+    .perf-kpis{grid-template-columns:repeat(2,1fr)}
   }
   @media (max-width:620px){ .rd-grid{grid-template-columns:1fr 1fr; gap:18px} .wx{grid-template-columns:1fr 1fr; gap:16px} }
 </style>
@@ -129,7 +204,7 @@
       <span class="dot"></span>
       <div>
         <h1>GridSight</h1>
-        <span class="sub">UK national solar output · probabilistic, half-hourly · by <b>Tien Dat Hoang</b></span>
+        <span class="sub">Great Britain national solar output · probabilistic, half-hourly · by <b>Tien Dat Hoang</b></span>
       </div>
     </div>
     <div class="issued">
@@ -139,7 +214,15 @@
     </div>
   </header>
 
-  <div class="main">
+  <div class="viewbar">
+    <div class="seg" id="seg-view">
+      <button data-view="explore" class="on">Forecast explorer</button>
+      <button data-view="perf">Model performance</button>
+    </div>
+    <span class="viewbar-note" id="viewbar-note"></span>
+  </div>
+
+  <div class="main" id="view-explore">
     <!-- LEFT: controls + chart + stats + readout -->
     <div>
       <div class="controls">
@@ -171,24 +254,29 @@
 
       <div class="card chart">
         <div class="chart-head">
-          <span class="lab">Output · MW · <span id="span">—</span></span>
+          <span class="lab">Output · MW · <b style="color:var(--muted);font-weight:600">Great Britain</b> · <span id="span">—</span></span>
           <div class="legend">
             <span style="color:var(--amber)"><i class="sw b"></i>p10–p90</span>
             <span style="color:var(--amber)"><i class="sw"></i>forecast</span>
             <span style="color:var(--teal)"><i class="sw"></i>actual</span>
             <span style="color:var(--muted)"><i class="sw d"></i>NESO</span>
+            <span id="lg-trend" style="color:var(--trend);display:none"><i class="sw"></i>trend</span>
           </div>
         </div>
-        <svg class="plot" id="plot" viewBox="0 0 1000 468" role="img" tabindex="0"
+        <svg class="plot" id="plot" viewBox="0 0 1000 348" role="img" tabindex="0"
              aria-label="Solar generation forecast versus actual and NESO baseline over time"></svg>
       </div>
 
       <section class="stats" id="stats"></section>
 
       <div class="card readout">
+        <div class="rd-head">
+          <div class="rd-when" id="rd-when">—</div>
+          <div class="cond" id="rd-cond" style="display:none"><i class="cdot"></i><span></span></div>
+        </div>
         <div class="rd-grid">
           <div class="rd">
-            <div class="lab">Slot <span class="num" id="rd-time">—</span></div>
+            <div class="lab">Forecast</div>
             <div class="big"><span id="r-q50">—</span> <small>· <span id="r-model">forecast</span> p50</small></div>
             <div class="sub" id="r-band">p10–p90 —</div>
           </div>
@@ -225,15 +313,16 @@
            the grid — the operational benchmark every model is judged against.</p>
 
         <h2>Beating NESO</h2>
-        <p>Across <b>2 years of out-of-sample</b> data, the stacked model (LightGBM&nbsp;+&nbsp;TCN,
-           quantile) cuts NESO's mean absolute error roughly in half, and keeps ~9 in 10 actuals
-           inside its p10–p90 band. Scrub the timeline — it holds across seasons.</p>
+        <p>The dashboard's model is <b>retrained weekly</b>, so most of the 2-year backtest is data
+           it has already trained on. Judged honestly — on the <b>genuinely out-of-sample</b> months
+           only — the stack still cuts NESO's mean absolute error by about a third, with its p10–p90
+           band close to nominal. See the <b>Model performance</b> tab for the in-sample split.</p>
         <div class="kpi">
-          <div><div class="lab">Skill vs NESO</div><div class="n tl" id="k-skill">—</div></div>
-          <div><div class="lab">Coverage</div><div class="n" id="k-cov">—</div></div>
+          <div><div class="lab">Skill vs NESO · OOS</div><div class="n tl" id="k-skill">—</div></div>
+          <div><div class="lab">Coverage · OOS</div><div class="n" id="k-cov">—</div></div>
         </div>
-        <p style="color:var(--faint);font-size:12px">Skill = reduction in MAE vs NESO over the full record.
-           The stack beats the univariate Chronos baseline, which trails NESO.</p>
+        <p style="color:var(--faint);font-size:12px">Skill = reduction in MAE vs NESO, scored on out-of-sample
+           data only. The stack beats the univariate Chronos baseline, which trails NESO.</p>
       </div>
 
       <div class="card panel" id="tab-data" style="display:none">
@@ -256,6 +345,65 @@
     </aside>
   </div>
 
+  <!-- PERFORMANCE VIEW — all metrics computed client-side from history.json -->
+  <section class="perf" id="view-perf" hidden>
+    <div class="perf-top">
+      <div>
+        <h2 class="perf-title">Model performance</h2>
+        <p class="perf-sub">Daylight half-hours · full out-of-sample record · scored vs NESO, the operator's own forecast · <span id="perf-model">Stack · 12 h</span></p>
+      </div>
+      <div class="perf-ctrls">
+        <div class="ctl"><span class="lab">Model</span>
+          <div class="seg" id="pseg-model">
+            <button data-model="stack">Stack</button>
+            <button data-model="chronos">Chronos</button>
+          </div></div>
+        <div class="ctl"><span class="lab">Horizon</span>
+          <div class="seg" id="pseg-h">
+            <button data-h="6h">6&nbsp;h</button>
+            <button data-h="12h">12&nbsp;h</button>
+          </div></div>
+      </div>
+    </div>
+
+    <div class="perf-note" id="perf-note"></div>
+
+    <section class="perf-kpis" id="perf-kpis"></section>
+
+    <div class="perf-grid">
+      <div class="card perf-card span2">
+        <div class="perf-head">
+          <span class="lab">Skill vs NESO · month × hour of day <span class="perf-unit">— % MAE reduction, deeper teal = better</span></span>
+          <span class="perf-scale" id="heat-scale"></span>
+        </div>
+        <div id="heatmap"></div>
+        <p class="perf-insight" id="heat-insight">—</p>
+      </div>
+
+      <div class="card perf-card">
+        <div class="perf-head"><span class="lab">Skill vs NESO · by month</span></div>
+        <svg id="trend" class="perf-svg" viewBox="0 0 520 200" role="img"></svg>
+        <p class="perf-insight" id="trend-insight">—</p>
+      </div>
+
+      <div class="card perf-card">
+        <div class="perf-head"><span class="lab">By season &amp; sky condition</span></div>
+        <div id="season-tbl" class="perf-tbl"></div>
+        <div id="sky-tbl" class="perf-tbl" style="margin-top:10px"></div>
+        <p class="perf-insight" id="break-insight">—</p>
+      </div>
+
+      <div class="card perf-card">
+        <div class="perf-head"><span class="lab">Interval calibration · p10–p90</span></div>
+        <div class="calib-wrap">
+          <svg id="calib" class="perf-svg" viewBox="0 0 200 200" role="img"></svg>
+          <div class="calib-read" id="calib-read"></div>
+        </div>
+        <p class="perf-insight" id="calib-insight">—</p>
+      </div>
+    </div>
+  </section>
+
   <footer>
     <div>Sources <b>PV_Live · NESO · Met Office UK-2km (AWS)</b></div>
     <div><b>Tien Dat Hoang</b> · <span id="foot-window">—</span></div>
@@ -267,7 +415,7 @@
 <script>window.GRIDSIGHT_API_BASE = window.GRIDSIGHT_API_BASE || "";</script>
 <script>
 const API_BASE = String(window.GRIDSIGHT_API_BASE || "").replace(/\/+$/, "");
-const P={ml:52,mr:14,mt:16,mb:30,w:1000,h:468};
+const P={ml:50,mr:14,mt:14,mb:26,w:1000,h:348};
 const $=id=>document.getElementById(id);
 const NS="http://www.w3.org/2000/svg";
 const el=(n,a={})=>{const e=document.createElementNS(NS,n);for(const k in a)e.setAttribute(k,a[k]);return e;};
@@ -277,7 +425,8 @@ const MON=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","De
 const p2=n=>String(n).padStart(2,"0");
 
 let HIST=null, S=null, Q=null, curH="12h", curModel="stack";
-let winPts=336, i0=0, sel=-1, R=[], yMax=16000, START=0, STEP=1800000;
+let winPts=336, i0=0, sel=-1, R=[], TREND=null, yMax=16000, START=0, STEP=1800000;
+let oosI=-1;   // series index where out-of-sample begins for the current model (-1 = n/a)
 let dragging=false, dragX=0, dragI0=0, didDrag=false;
 
 const tsAt=i=>new Date(START + i*STEP);
@@ -286,6 +435,29 @@ const tsAt=i=>new Date(START + i*STEP);
 function agg(a,i,j,fn){let acc=null,c=0;for(let k=i;k<j;k++){const v=a[k];if(v==null)continue;
   acc=acc==null?v:fn(acc,v);c++;}return c?acc:null;}
 function mean(a,i,j){let s=0,c=0;for(let k=i;k<j;k++){if(a[k]!=null){s+=a[k];c++;}}return c?s/c:null;}
+
+// Size the chart to the viewport height so the whole dashboard — chart + stats + readout —
+// lives in one frame with no scroll. On the two-column desktop layout the SVG height is set
+// so it exactly fills the space left after everything above/below it; on narrow single-column
+// layouts we fall back to the natural aspect ratio (scrolling there is expected).
+function fitChart(){
+  const svg=$("plot");
+  if(innerWidth<=980){ P.h=348; svg.style.height="auto"; svg.setAttribute("viewBox","0 0 1000 "+P.h); return; }
+  svg.style.height="auto";
+  const r=svg.getBoundingClientRect();
+  const rd=document.querySelector(".card.readout").getBoundingClientRect();
+  const fEl=document.querySelector("footer"), fr=fEl.getBoundingClientRect();
+  const wrapPadB=parseFloat(getComputedStyle(document.querySelector(".wrap")).paddingBottom)||0;
+  const footerMt=parseFloat(getComputedStyle(fEl).marginTop)||0;
+  // below = the LEFT COLUMN content after the chart (stats + readout) + the footer block. We
+  // measure to the readout's bottom, NOT the footer's — the footer can be pushed down by the
+  // (taller, sticky) sidebar, which would otherwise fool us into shrinking the chart to nothing.
+  const top=r.top+scrollY, below=(rd.bottom-r.bottom)+fr.height+footerMt+wrapPadB, w=r.width||900;
+  const H=clamp(Math.round(innerHeight-top-below-8),190,460);
+  P.h=Math.round(1000*H/w);
+  svg.style.height=H+"px";
+  svg.setAttribute("viewBox","0 0 1000 "+P.h);
+}
 
 function build(){
   const n=S.n; winPts=clamp(winPts,24,n); i0=clamp(i0,0,n-winPts);
@@ -301,6 +473,16 @@ function build(){
   }
   let m=0; for(const d of R){m=Math.max(m,d.q90||0,d.actual||0,d.neso||0);}
   yMax=Math.max(4000,Math.ceil(m/2000)*2000);
+  // smooth trend (centered moving average of actual) — reveals the seasonal direction the
+  // day/night sawtooth otherwise hides. Only meaningful over long windows (1 mo, 3 mo, 1 yr).
+  TREND=null;
+  if(winPts>=1000){
+    const W=clamp(Math.round(R.length/14),5,90);
+    TREND=R.map((_,k)=>{let s=0,c=0;
+      for(let j=Math.max(0,k-W);j<=Math.min(R.length-1,k+W);j++){const v=R[j].actual;if(v!=null){s+=v;c++;}}
+      return c?s/c:null;});
+  }
+  $("lg-trend").style.display=TREND?"":"none";
   if(sel<i0||sel>=i1) sel=-1;
   windowStats(i0,i1);
   draw(); updateReadout();
@@ -320,7 +502,13 @@ function windowStats(i0,i1){
     if(lo!=null&&hi!=null){cb++; if(a>=lo&&a<=hi) inb++;}
   }
   const skill=c?1-sm/sn:null, cov=cb?inb/cb:null, mae=c?sm/c:null;
-  $("stats").innerHTML=[
+  // regime badge: warn when the visible window is data the model was trained on (skill inflated)
+  const frac = oosI<0 ? -1 : (clamp(Math.min(oosI,i1),i0,i1)-i0)/(i1-i0||1);
+  let chip="";
+  if(frac>0.5) chip=`<div class="stat"><div class="lab">Regime</div><div class="v" style="color:var(--amber);font-size:17px">in-sample<small> skill optimistic</small></div></div>`;
+  else if(frac>0) chip=`<div class="stat"><div class="lab">Regime</div><div class="v" style="font-size:17px">mixed<small> in + out-of-sample</small></div></div>`;
+  else if(frac===0) chip=`<div class="stat"><div class="lab">Regime</div><div class="v" style="color:var(--teal);font-size:17px">out-of-sample<small> honest</small></div></div>`;
+  $("stats").innerHTML=chip+[
     ["Skill vs NESO", skill==null?"—":(skill>=0?"+":"")+(skill*100).toFixed(0), "% lower MAE", skill>=0?"good":"bad"],
     ["Coverage p10–p90", cov==null?"—":(cov*100).toFixed(0), "% of actuals", "good"],
     ["Model MAE", mae==null?"—":(mae/1000).toFixed(2), "GW abs error", ""],
@@ -345,6 +533,20 @@ function draw(){
   if(winPts<=400){let i=0;while(i<R.length){if(R[i].day===0){let j=i;while(j<R.length&&R[j].day===0)j++;
     const a=xAt(Math.max(0,i-.5)),b=xAt(Math.min(R.length-1,j-.5));
     s.appendChild(el("rect",{class:"night",x:a,y:P.mt,width:Math.max(0,b-a),height:P.h-P.mt-P.mb}));i=j;}else i++;}}
+  // in-sample vs out-of-sample: the live model was trained on the tinted span, so skill there
+  // is optimistic; the clear span to the right is the genuinely out-of-sample data.
+  if(oosI>=0){
+    const i1=i0+winPts;
+    if(oosI>=i1){
+      s.appendChild(el("rect",{class:"insample-bg",x:P.ml,y:P.mt,width:P.w-P.mr-P.ml,height:P.h-P.mt-P.mb}));
+    } else if(oosI>i0){
+      let k=R.findIndex(d=>d.i>=oosI); if(k<0)k=R.length-1;
+      const x=k<=0?P.ml:xAt(k);
+      s.appendChild(el("rect",{class:"insample-bg",x:P.ml,y:P.mt,width:Math.max(0,x-P.ml),height:P.h-P.mt-P.mb}));
+      s.appendChild(el("line",{class:"oos-line",x1:x,x2:x,y1:P.mt,y2:P.h-P.mb}));
+      const t=el("text",{class:"ooslabel",x:Math.min(x+5,P.w-P.mr-72),y:P.mt+22}); t.textContent="out-of-sample →"; s.appendChild(t);
+    }
+  }
   // live forecast region (right edge) — real next-12h pulled from the API
   if(S&&S.liveFrom!=null&&S.liveFrom<i0+winPts){
     let k=R.findIndex(d=>d.i>=S.liveFrom); if(k<0)k=R.length-1;
@@ -360,6 +562,10 @@ function draw(){
   s.appendChild(el("path",{class:"neso",d:linePath(d=>d.neso)}));
   s.appendChild(el("path",{class:"actual",d:linePath(d=>d.actual)}));
   s.appendChild(el("path",{class:"q50",d:linePath(d=>d.q50)}));
+  // faint smoothed trend line over long windows
+  if(TREND){let tp="",pen=false;TREND.forEach((v,k)=>{if(v==null){pen=false;return;}
+    tp+=(pen?"L":"M")+xAt(k).toFixed(1)+" "+yAt(v).toFixed(1)+" ";pen=true;});
+    if(tp)s.appendChild(el("path",{class:"trend",d:tp}));}
   // x time axis
   const ticks=Math.min(7,R.length); const sp=spanHours();
   for(let t=0;t<ticks;t++){const k=Math.round(t*(R.length-1)/(ticks-1||1));const x=xAt(k);
@@ -367,23 +573,46 @@ function draw(){
     const tx=el("text",{x:x,y:P.h-P.mb+16,"text-anchor":t===0?"start":t===ticks-1?"end":"middle"});
     tx.textContent=tlabel(R[k].t,sp);s.appendChild(tx);}
   s.appendChild(el("line",{class:"axis-line",x1:P.ml,x2:P.w-P.mr,y1:P.h-P.mb,y2:P.h-P.mb}));
-  // "LIVE" tag on the forecast region
+  // "FORECAST" tag on the forecast region
   if(S&&S.liveFrom!=null&&S.liveFrom>=i0&&S.liveFrom<i0+winPts){
     let k=R.findIndex(d=>d.i>=S.liveFrom); if(k<0)k=R.length-1; const x=k<=0?P.ml:xAt(k);
-    const t=el("text",{class:"livetag",x:Math.min(x+5,P.w-P.mr-34),y:P.mt+11}); t.textContent="LIVE"; s.appendChild(t);}
-  // selection crosshair + dots
+    const t=el("text",{class:"livetag",x:Math.min(x+5,P.w-P.mr-62),y:P.mt+11}); t.textContent="FORECAST"; s.appendChild(t);}
+  // selection crosshair + dots + in-chart value box
   if(sel>=0){const k=R.reduce((best,d,idx)=>Math.abs(d.i-sel)<Math.abs(R[best].i-sel)?idx:best,0);
     const d=R[k],x=xAt(k);
     s.appendChild(el("line",{class:"cross",x1:x,x2:x,y1:P.mt,y2:P.h-P.mb}));
     if(d.actual!=null)s.appendChild(el("circle",{class:"dot a",cx:x,cy:yAt(d.actual),r:4}));
-    if(d.q50!=null)s.appendChild(el("circle",{class:"dot",cx:x,cy:yAt(d.q50),r:4}));}
+    if(d.q50!=null)s.appendChild(el("circle",{class:"dot",cx:x,cy:yAt(d.q50),r:4}));
+    drawValueBox(s,d,x);}
+}
+
+// small floating box with the three line values at the hovered slot — sits in whichever
+// top corner is away from the cursor so it never covers the point being read.
+function txt(x,y,anchor,fill,size,str){const t=el("text",{x:x,y:y,"text-anchor":anchor});
+  t.style.fill=fill;t.style.fontSize=size;t.textContent=str;return t;}
+function drawValueBox(s,d,x){
+  const bw=142,bh=78,pad=11;
+  const onRight=x>(P.ml+(P.w-P.mr))/2, bx=onRight?P.ml+8:P.w-P.mr-bw-8, by=P.mt+6;
+  const g=el("g",{});
+  g.appendChild(el("rect",{class:"vbox-bg",x:bx,y:by,width:bw,height:bh,rx:7}));
+  const bt=spanHours()<=48?p2(d.t.getUTCHours())+":"+p2(d.t.getUTCMinutes())+"Z":fmtDay(d.t);
+  g.appendChild(txt(bx+pad,by+16,"start","var(--muted)","10px",bt+"  ·  GW"));
+  [["forecast",d.q50,"var(--amber)"],["actual",d.actual,"var(--teal)"],["NESO",d.neso,"var(--muted)"]]
+    .forEach((r,idx)=>{const yy=by+35+idx*15;
+      g.appendChild(el("circle",{cx:bx+pad+3,cy:yy-4,r:3.5,fill:r[2]}));
+      g.appendChild(txt(bx+pad+13,yy,"start","var(--muted)","11px",r[0]));
+      g.appendChild(txt(bx+bw-pad,yy,"end","var(--ink)","11.5px",gw(r[1])));});
+  s.appendChild(g);
 }
 
 // ---- readout ------------------------------------------------------------------
 function updateReadout(){
   const k=sel>=0?R.reduce((b,d,idx)=>Math.abs(d.i-sel)<Math.abs(R[b].i-sel)?idx:b,0):R.length-1;
   const d=R[k]; if(!d)return;
-  $("rd-time").textContent=fmtFull(d.t);
+  $("rd-when").textContent=fmtWhen(d.t);
+  const sc=skyCond(d), cd=$("rd-cond");
+  if(sc){cd.style.display=""; cd.querySelector(".cdot").style.background=sc.col; cd.querySelector("span").textContent=sc.t;}
+  else cd.style.display="none";
   $("r-q50").textContent=gw(d.q50); $("r-band").textContent="p10–p90  "+gw(d.q10)+" – "+gw(d.q90)+" GW";
   $("r-act").textContent=gw(d.actual);
   $("r-neso").textContent=gw(d.neso);
@@ -415,6 +644,22 @@ function tlabel(d,sp){if(sp<=48)return p2(d.getUTCHours())+":"+p2(d.getUTCMinute
   return MON[d.getUTCMonth()]+" "+String(d.getUTCFullYear()).slice(2);}
 const fmtDay=d=>p2(d.getUTCDate())+" "+MON[d.getUTCMonth()]+" "+d.getUTCFullYear();
 const fmtFull=d=>fmtDay(d)+" "+p2(d.getUTCHours())+":"+p2(d.getUTCMinutes())+"Z";
+const fmtWhen=d=>fmtDay(d)+" · "+p2(d.getUTCHours())+":"+p2(d.getUTCMinutes())+"Z";
+
+// Sky condition for the half-hour being read — cloud cover is what actually drives solar
+// output, so the label describes the sky (not wind). Night when the sun is down.
+function skyCond(d){
+  if(!d) return null;
+  if(d.day===0) return {t:"Night", col:"#5b6470"};
+  const cl=d.cloud;
+  if(cl==null){
+    if(d.ssrd==null) return null;
+    return d.ssrd>350?{t:"Sunny",col:"#e0a41f"}:d.ssrd>120?{t:"Partly cloudy",col:"#8a94a0"}:{t:"Overcast",col:"#9aa0a8"};
+  }
+  if(cl<25) return {t:"Sunny", col:"#e0a41f"};
+  if(cl<60) return {t:"Partly cloudy", col:"#8a94a0"};
+  return {t:"Overcast", col:"#9aa0a8"};
+}
 
 // ---- interaction --------------------------------------------------------------
 function pxToIndex(clientX){const s=$("plot"),r=s.getBoundingClientRect();
@@ -432,7 +677,7 @@ function bindPlot(){
       i0=clamp(dragI0+dIdx,0,S.n-winPts);build();
     } else {sel=pxToIndex(e.clientX);draw();updateReadout();}
   });
-  s.addEventListener("pointerup",e=>{dragging=false;if(!didDrag){sel=pxToIndex(e.clientX);draw();updateReadout();}});
+  s.addEventListener("pointerup",e=>{dragging=false;if(!didDrag){jumpToDay(pxToIndex(e.clientX));}});
   s.addEventListener("pointerleave",()=>{if(!dragging){sel=-1;draw();updateReadout();}});
   s.addEventListener("keydown",e=>{
     const step=e.shiftKey?Math.round(winPts/2):Math.max(1,Math.round(winPts/48));
@@ -441,6 +686,16 @@ function bindPlot(){
   });
 }
 function pan(delta){i0=clamp(i0+delta,0,S.n-winPts);sel=-1;build();}
+
+// click anywhere on any window → zoom into the 24 h window for that calendar day, with the
+// clicked half-hour kept selected so the readout lands on it.
+function jumpToDay(idx){
+  if(idx<0||!S)return;
+  const d=tsAt(idx), dayStart=Date.UTC(d.getUTCFullYear(),d.getUTCMonth(),d.getUTCDate());
+  winPts=clamp(48,24,S.n);
+  i0=clamp(Math.round((dayStart-START)/STEP),0,S.n-winPts);
+  sel=idx; mark(); build();
+}
 
 function mark(){
   document.querySelectorAll("[data-model]").forEach(b=>b.classList.toggle("on",b.dataset.model===curModel));
@@ -515,6 +770,7 @@ async function ensureLive(hz,model){
 function applyView(resetPan){
   S=HIST.series[curH]; Q=S.models[curModel];
   START=Date.parse(S.start); STEP=S.step_min*60000;
+  oosI = curModel==="stack" ? oosStartIdx(S) : -1;   // chronos is zero-shot → no in-sample region
   winPts=clamp(winPts,24,S.n);
   if(resetPan) i0=S.n-winPts;
   i0=clamp(i0,0,S.n-winPts); sel=-1;
@@ -524,6 +780,207 @@ function applyView(resetPan){
   build();
   // fetch live forecast (if API configured) and redraw when it arrives
   ensureLive(curH,curModel).then(changed=>{ if(changed){ if(resetPan) i0=S.n-winPts; build(); } });
+}
+
+// ===== performance view — everything computed client-side from history.json ==========
+let curView="explore";
+// history.json (generated 2026-07-15) was produced by the LIVE weekly-retrained stack model,
+// whose rolling split trains on all-but-the-recent-holdout. So most of the 2-year span is
+// in-sample for that model: skill AND p10–p90 coverage both step down sharply at 2026-01
+// (skill ~63%→~30%, coverage ~0.95→~0.80), marking where the data becomes genuinely
+// out-of-sample. That boundary is where we score the honest numbers. Chronos is zero-shot
+// (never trained on this data) so the whole record is already out-of-sample for it.
+const OOS_START = "2026-01-01T00:00:00Z";
+const oosStartIdx = s => Math.max(0, Math.round((Date.parse(OOS_START)-Date.parse(s.start))/(s.step_min*60000)));
+const acc=()=>({sm:0,sn:0,c:0,inb:0,cb:0,le10:0,le50:0,le90:0});
+function addPt(o,a,p,ne,lo,hi){o.sm+=Math.abs(a-p);o.sn+=Math.abs(a-ne);o.c++;
+  if(lo!=null&&hi!=null){o.cb++;if(a>=lo&&a<=hi)o.inb++;if(a<=lo)o.le10++;if(a<=hi)o.le90++;}
+  if(a<=p)o.le50++;}
+const fin=o=>({n:o.c, mae:o.c?o.sm/o.c:null, nemae:o.c?o.sn/o.c:null,
+  skill:(o.c&&o.sn)?1-o.sm/o.sn:null, cov:o.cb?o.inb/o.cb:null,
+  q10:o.cb?o.le10/o.cb:null, q50:o.c?o.le50/o.c:null, q90:o.cb?o.le90/o.cb:null});
+const SEASON=m=>[11,0,1].includes(m)?0:[2,3,4].includes(m)?1:[5,6,7].includes(m)?2:3;
+const SEASON_NAME=["Winter","Spring","Summer","Autumn"];
+const fmtPct=(x,s)=>x==null?"—":(s&&x>=0?"+":"")+(x*100).toFixed(0)+"%";
+const fmtGW=mw=>mw==null?"—":(mw/1000).toFixed(2);
+
+function computePerf(hz,model){
+  const s=HIST.series[hz], q=s.models[model];
+  const st=Date.parse(s.start), step=s.step_min*60000;
+  const oi = model==="chronos" ? 0 : oosStartIdx(s);   // chronos: zero-shot → whole record is OOS
+  const hasIS = oi>0;
+  const heat={}, monthly={}, monthlyKeys=[];
+  // season/sky/oos/ins are scored on the HONEST region only (OOS for stack, all for chronos);
+  // heat + monthly span the full record so the trend chart can show the in→out-of-sample shift.
+  const season=[acc(),acc(),acc(),acc()], sky={sun:acc(),mix:acc(),over:acc()};
+  const oos=acc(), ins=acc();
+  for(let k=0;k<s.n;k++){
+    const a=s.actual[k]; if(a==null||a<50)continue;
+    const p=q.q50[k], ne=s.neso[k]; if(p==null||ne==null)continue;
+    const lo=q.q10[k], hi=q.q90[k];
+    const d=new Date(st+k*step), m=d.getUTCMonth(), h=d.getUTCHours(), isOOS=(k>=oi);
+    const hk=h*12+m; (heat[hk]||(heat[hk]=acc())); addPt(heat[hk],a,p,ne,lo,hi);
+    const mk=d.getUTCFullYear()*12+m;
+    if(!monthly[mk]){monthly[mk]=acc();monthly[mk]._y=d.getUTCFullYear();monthly[mk]._m=m;monthly[mk]._oos=isOOS;monthlyKeys.push(mk);}
+    addPt(monthly[mk],a,p,ne,lo,hi);
+    if(isOOS){
+      addPt(oos,a,p,ne,lo,hi); addPt(season[SEASON(m)],a,p,ne,lo,hi);
+      const cl=s.cloud[k], sk=cl==null?null:(cl<25?"sun":cl<60?"mix":"over"); if(sk)addPt(sky[sk],a,p,ne,lo,hi);
+    } else addPt(ins,a,p,ne,lo,hi);
+  }
+  monthlyKeys.sort((x,y)=>x-y);
+  return {heat, monthly, monthlyKeys, season:season.map(fin),
+    sky:{sun:fin(sky.sun),mix:fin(sky.mix),over:fin(sky.over)},
+    oos:fin(oos), ins:fin(ins), hasIS, oosStartMs: st + oi*step, oi};
+}
+
+// diverging skill colour: amber (worse than NESO) → pale (matches) → teal (beats it)
+const C_BAD=[201,138,37], C_MID=[238,238,232], C_GOOD=[47,111,98];
+const lerpC=(a,b,t)=>`rgb(${Math.round(a[0]+(b[0]-a[0])*t)},${Math.round(a[1]+(b[1]-a[1])*t)},${Math.round(a[2]+(b[2]-a[2])*t)})`;
+function skillColor(sk){ if(sk==null)return "transparent";
+  return sk<0 ? lerpC(C_MID,C_BAD,clamp(sk/-0.35,0,1)) : lerpC(C_MID,C_GOOD,clamp(sk/0.6,0,1)); }
+const mkTitle=str=>{const t=document.createElementNS(NS,"title");t.textContent=str;return t;};
+
+function renderHeat(M){
+  let hMin=23,hMax=0; for(const kk in M.heat){const h=kk/12|0; if(h<hMin)hMin=h; if(h>hMax)hMax=h;}
+  if(hMin>hMax){hMin=4;hMax=20;}
+  const cw=30, ch=15, cols=12, rows=hMax-hMin+1, x0=32, y0=6, W=x0+cols*cw+6, H=y0+rows*ch+18;
+  const svg=el("svg",{class:"heat-svg",viewBox:`0 0 ${W} ${H}`,"preserveAspectRatio":"xMidYMid meet",role:"img"});
+  for(let h=hMin;h<=hMax;h++){const ri=h-hMin;
+    for(let m=0;m<12;m++){const o=M.heat[h*12+m], f=o&&fin(o);
+      const rc=el("rect",{class:"heat-cell",x:x0+m*cw,y:y0+ri*ch,width:cw,height:ch,fill:skillColor(f?f.skill:null)});
+      if(f&&f.n)rc.appendChild(mkTitle(`${MON[m]} ${p2(h)}:00 · skill ${fmtPct(f.skill,true)} · MAE ${fmtGW(f.mae)} GW · n=${f.n}`));
+      svg.appendChild(rc);}
+    if(h%3===0){const t=el("text",{x:x0-5,y:y0+ri*ch+ch-4,"text-anchor":"end"});t.textContent=p2(h)+"h";svg.appendChild(t);}}
+  for(let m=0;m<12;m++){const t=el("text",{x:x0+m*cw+cw/2,y:H-5,"text-anchor":"middle"});t.textContent="JFMAMJJASOND"[m];svg.appendChild(t);}
+  const box=$("heatmap"); box.innerHTML=""; box.appendChild(svg);
+}
+
+function renderTrend(M){
+  const rows=M.monthlyKeys.map(k=>({f:fin(M.monthly[k]),y:M.monthly[k]._y,m:M.monthly[k]._m,oos:M.monthly[k]._oos})).filter(o=>o.f.n>=50);
+  const svg=$("trend"); svg.innerHTML=""; const n=rows.length; if(!n)return;
+  const W=520,H=200,ml=28,mr=8,mt=12,mb=22;
+  const sks=rows.map(o=>o.f.skill); let lo=Math.min(0,...sks),hi=Math.max(0.1,...sks);
+  const pd=(hi-lo)*0.12||0.05; lo-=pd; hi+=pd;
+  const xAt=i=>ml+(n<=1?0:i/(n-1)*(W-ml-mr)), yAt=v=>mt+(1-(v-lo)/(hi-lo))*(H-mt-mb);
+  const yz=yAt(0);
+  // in-sample shading + out-of-sample divider
+  const splitI=rows.findIndex(o=>o.oos);
+  if(splitI>0){
+    const xb=(xAt(splitI-1)+xAt(splitI))/2;
+    svg.appendChild(el("rect",{class:"insample-bg",x:ml,y:mt,width:Math.max(0,xb-ml),height:H-mt-mb}));
+    svg.appendChild(el("line",{class:"oos-line",x1:xb,x2:xb,y1:mt,y2:H-mb}));
+    const a=el("text",{x:xb-3,y:mt+8,"text-anchor":"end"});a.textContent="in-sample";a.style.fontSize="8px";svg.appendChild(a);
+    const b=el("text",{x:xb+3,y:mt+8,"text-anchor":"start"});b.textContent="OOS →";b.style.fontSize="8px";svg.appendChild(b);
+  }
+  svg.appendChild(el("line",{x1:ml,x2:W-mr,y1:yz,y2:yz,stroke:"var(--hair)"}));
+  [["0",0],[(hi*100).toFixed(0),hi]].forEach(([lab,v])=>{const t=el("text",{x:ml-4,y:yAt(v)+3,"text-anchor":"end"});t.textContent=lab;svg.appendChild(t);});
+  const bw=Math.max(2,(W-ml-mr)/n*0.68);
+  rows.forEach((o,i)=>{const x=xAt(i),y=yAt(o.f.skill),top=Math.min(y,yz),h=Math.max(1,Math.abs(y-yz));
+    const rc=el("rect",{x:x-bw/2,y:top,width:bw,height:h,fill:o.f.skill>=0?"var(--teal)":"var(--amber)",opacity:.85});
+    rc.appendChild(mkTitle(`${MON[o.m]} ${o.y} · skill ${fmtPct(o.f.skill,true)} · MAE ${fmtGW(o.f.mae)} GW · n=${o.f.n}`));
+    svg.appendChild(rc);
+    if(o.m===0||i===0){const tx=el("text",{x:x,y:H-6,"text-anchor":"middle"});tx.textContent=(o.m===0?"Jan ":"")+String(o.y).slice(2);svg.appendChild(tx);}});
+}
+
+function tblRows(rows){
+  const head=`<div class="r h"><span class="c">&nbsp;</span><span class="c">Skill</span><span class="c">MAE</span><span class="c">Cover</span><span class="c">n</span></div>`;
+  return head+rows.map(([nm,f])=>`<div class="r"><span class="c">${nm}</span>`+
+    `<span class="c sk" style="color:${f.skill>=0?'var(--teal)':'var(--amber)'}">${fmtPct(f.skill,true)}</span>`+
+    `<span class="c">${fmtGW(f.mae)}</span>`+
+    `<span class="c">${f.cov==null?'—':(f.cov*100).toFixed(0)+'%'}</span>`+
+    `<span class="c">${f.n.toLocaleString()}</span></div>`).join("");
+}
+function renderTables(M){
+  $("season-tbl").innerHTML=tblRows(SEASON_NAME.map((nm,i)=>[nm,M.season[i]]));
+  $("sky-tbl").innerHTML=tblRows([["Sunny",M.sky.sun],["Partly cloudy",M.sky.mix],["Overcast",M.sky.over]]);
+}
+
+function renderCalib(M){
+  const o=M.oos, svg=$("calib"); svg.innerHTML="";
+  const W=200,H=200,m=24, xAt=v=>m+v*(W-2*m), yAt=v=>H-m-v*(H-2*m);
+  svg.appendChild(el("line",{x1:m,y1:H-m,x2:W-m,y2:H-m,stroke:"var(--hair)"}));
+  svg.appendChild(el("line",{x1:m,y1:H-m,x2:m,y2:m,stroke:"var(--hair)"}));
+  svg.appendChild(el("line",{x1:xAt(0),y1:yAt(0),x2:xAt(1),y2:yAt(1),stroke:"var(--faint)","stroke-dasharray":"3 3"}));
+  let path=""; [[0.1,o.q10],[0.5,o.q50],[0.9,o.q90]].forEach(([nom,obs])=>{ if(obs==null)return;
+    path+=(path?"L":"M")+xAt(nom).toFixed(1)+" "+yAt(obs).toFixed(1)+" ";
+    svg.appendChild(el("circle",{cx:xAt(nom),cy:yAt(obs),r:4,fill:"var(--teal)"}));});
+  if(path)svg.appendChild(el("path",{d:path,fill:"none",stroke:"var(--teal)","stroke-width":1.4,opacity:.6}));
+  [["0",0],["·5",0.5],["1",1]].forEach(([lab,v])=>{const t=el("text",{x:xAt(v),y:H-m+11,"text-anchor":"middle"});t.textContent=lab;svg.appendChild(t);});
+  const lx=el("text",{x:W/2,y:H-3,"text-anchor":"middle"});lx.textContent="nominal quantile";svg.appendChild(lx);
+  $("calib-read").innerHTML=`<span class="big">${o.cov==null?'—':(o.cov*100).toFixed(0)+'%'}</span>actual inside p10–p90`+
+    `<div style="color:var(--muted);margin-top:2px">nominal 80%</div>`+
+    `<div class="lab" style="color:var(--muted)">median split</div>`+
+    `<span class="big" style="font-size:16px">${o.q50==null?'—':(o.q50*100).toFixed(0)+'%'}</span>below p50 <span style="color:var(--faint)">(target 50%)</span>`;
+}
+
+function oosRangeLabel(M){
+  const s=HIST.series[curH]; const endMs=Date.parse(s.start)+(s.n-1)*s.step_min*60000;
+  const f=d=>MON[d.getUTCMonth()]+" "+String(d.getUTCFullYear()).slice(2);
+  return M.hasIS ? f(new Date(M.oosStartMs))+"–"+f(new Date(endMs)) : "full record";
+}
+function setPerfNote(M){
+  const e=$("perf-note");
+  if(M.hasIS){
+    const d=new Date(M.oosStartMs);
+    e.innerHTML=`<span class="ico">⚠︎</span><div>This backtest is drawn by the <b>live weekly-retrained model</b>, so most of the 2-year span is <b>in-sample</b> — the model had already trained on it, and skill there (<span class="num">${fmtPct(M.ins.skill,true)}</span>) is optimistic. The honest figures below are scored <b>only on the genuinely out-of-sample data</b> after <b class="num">${MON[d.getUTCMonth()]} ${d.getUTCFullYear()}</b>, where skill and interval coverage settle to their true level — still a clear win over NESO.</div>`;
+  } else {
+    e.innerHTML=`<span class="ico">◈</span><div><b>Chronos is zero-shot</b> — it never trains on this data, so the whole record is genuinely out-of-sample (no in-sample inflation). The univariate baseline simply <b>loses to NESO</b> here, which is exactly why the weather-driven stack is needed.</div>`;
+  }
+}
+function renderKpis(M){
+  const o=M.oos;
+  const kpis=[];
+  kpis.push(["Out-of-sample skill", fmtPct(o.skill,true), "vs NESO · the honest number", o.skill>=0?"hero":"warn"]);
+  if(M.hasIS) kpis.push(["In-sample skill", fmtPct(M.ins.skill,true), "optimistic · model trained here", "warn"]);
+  else kpis.push(["Evaluation", "zero-shot", "never trained — all OOS", ""]);
+  kpis.push(["Model MAE · OOS", fmtGW(o.mae), "GW · vs "+fmtGW(o.nemae)+" NESO", ""]);
+  kpis.push(["Coverage · OOS", o.cov==null?"—":(o.cov*100).toFixed(0)+"%", "nominal 80%", ""]);
+  kpis.push(["OOS window", o.n.toLocaleString(), oosRangeLabel(M)+" · slots", ""]);
+  $("perf-kpis").innerHTML=kpis.map(k=>
+    `<div class="perf-kpi ${k[3]}"><div class="lab">${k[0]}</div><div class="v">${k[1]} <small>${k[2]}</small></div></div>`).join("");
+}
+
+function renderInsights(M){
+  let best=null,worst=null;
+  for(const kk in M.heat){const f=fin(M.heat[kk]); if(f.n<30)continue; const mo=kk%12,h=kk/12|0;
+    if(!best||f.skill>best.f.skill)best={f,mo,h};
+    if(!worst||f.skill<worst.f.skill)worst={f,mo,h};}
+  if(best&&worst)$("heat-insight").innerHTML=`<b>Full record</b> (mostly in-sample) — read it for the <b>shape</b>, not the level: error concentrates at low-sun dawn/dusk and in deep winter, and the model's relative edge is thinnest at high-summer midday (${MON[worst.mo]} ${p2(worst.h)}:00, ${fmtPct(worst.f.skill,true)}) when NESO is already easy to match.`;
+  const mk=M.monthlyKeys.map(k=>({f:fin(M.monthly[k]),oos:M.monthly[k]._oos})).filter(o=>o.f.n>=50);
+  const inS=mk.filter(o=>!o.oos).map(o=>o.f.skill), oS=mk.filter(o=>o.oos).map(o=>o.f.skill);
+  const mean=a=>a.length?a.reduce((x,y)=>x+y,0)/a.length:null;
+  if(M.hasIS && oS.length)
+    $("trend-insight").innerHTML=`The step down is the <b>train boundary</b>, not the weather: in-sample months average <b>${fmtPct(mean(inS),true)}</b>, but on truly unseen data skill settles to <b class="g">${fmtPct(mean(oS),true)}</b>. That drop is exactly why the honest number above is scored on the out-of-sample side only.`;
+  else
+    $("trend-insight").innerHTML=`Every month is out-of-sample for this zero-shot baseline, and it sits <b class="a">below NESO</b> throughout — weather and solar geometry, which it never sees, are what carry the problem.`;
+  const su=M.sky.sun,ov=M.sky.over, ssk=M.season.map(s=>s.skill).filter(x=>x!=null);
+  const smn=ssk.length?Math.min(...ssk):null, smx=ssk.length?Math.max(...ssk):null;
+  $("break-insight").innerHTML=`<span style="color:var(--faint)">Out-of-sample only.</span> Strongest on <b>clear days</b> (<b class="g">${fmtPct(su.skill,true)}</b>); on <b>overcast</b> — the most common UK sky — it narrows to <b>${fmtPct(ov.skill,true)}</b>, where forecasting solar is genuinely hard. Seasons shown are those the out-of-sample window covers.`;
+  const o=M.oos, conservative=o.cov!=null&&o.cov>0.85;
+  $("calib-insight").innerHTML=`On out-of-sample data p10–p90 captures <b>${o.cov==null?'—':(o.cov*100).toFixed(0)+'%'}</b> of actuals against a nominal <b>80%</b> — ${conservative?`still a touch <b class="a">conservative</b>`:`<b class="g">well-calibrated</b>`}. The much wider ~93% seen over the full record was an in-sample artefact; honest coverage is close to target.`;
+}
+
+function buildPerf(){
+  if(!HIST)return;
+  const M=computePerf(curH,curModel);
+  $("perf-model").textContent=(curModel==="stack"?"Stack LGBM+TCN":"Chronos-bolt")+" · "+curH+" ahead";
+  $("heat-scale").innerHTML=`<span>−35%</span><i style="background:linear-gradient(90deg,rgb(201,138,37),rgb(238,238,232),rgb(47,111,98))"></i><span>+60%</span>`;
+  setPerfNote(M); renderKpis(M); renderHeat(M); renderTrend(M); renderTables(M); renderCalib(M); renderInsights(M);
+  document.querySelectorAll("#pseg-model [data-model]").forEach(b=>b.classList.toggle("on",b.dataset.model===curModel));
+  document.querySelectorAll("#pseg-h [data-h]").forEach(b=>b.classList.toggle("on",b.dataset.h===curH));
+}
+
+function setView(v){
+  curView=v;
+  document.querySelectorAll("#seg-view [data-view]").forEach(b=>b.classList.toggle("on",b.dataset.view===v));
+  $("view-explore").hidden=(v!=="explore");
+  $("view-perf").hidden=(v!=="perf");
+  $("viewbar-note").textContent = v==="perf"
+    ? "How the model actually performs — skill over time, by season, sky condition & interval calibration."
+    : "Live next-12 h forecast + 2-year backtest — drag to scrub, click a day to zoom to 24 h.";
+  if(v==="perf") buildPerf();
+  else { fitChart(); build(); }
 }
 
 async function boot(){
@@ -541,6 +998,10 @@ async function boot(){
     document.querySelectorAll("#side-tabs button").forEach(x=>x.classList.toggle("on",x===b));
     $("tab-about").style.display=b.dataset.tab==="about"?"":"none";
     $("tab-data").style.display=b.dataset.tab==="data"?"":"none";});
+  // view toggle + performance-view model/horizon (kept in sync with the explorer)
+  $("seg-view").addEventListener("click",e=>{const b=e.target.closest("[data-view]");if(!b)return;setView(b.dataset.view);});
+  $("pseg-model").addEventListener("click",e=>{const b=e.target.closest("[data-model]");if(!b)return;curModel=b.dataset.model;mark();buildPerf();});
+  $("pseg-h").addEventListener("click",e=>{const b=e.target.closest("[data-h]");if(!b)return;curH=b.dataset.h;mark();buildPerf();});
   bindPlot();
 
   // data
@@ -555,12 +1016,16 @@ async function boot(){
   // headline KPIs (full record)
   fullStats();
   mark(); applyView(true);
+  fitChart(); build();
+  $("viewbar-note").textContent="Live next-12 h forecast + 2-year backtest — drag to scrub, click a day to zoom to 24 h.";
+  let rz; addEventListener("resize",()=>{clearTimeout(rz);rz=setTimeout(()=>{if(curView==="explore"){fitChart();if(S)build();}},150);});
   $("d-gen").textContent="Generated "+(HIST.generated_at||"").slice(0,10)+" · "+S.n.toLocaleString()+" half-hours × 2 horizons × 2 models";
 }
 
 function fullStats(){
-  const s=HIST.series["12h"], q=s.models.stack;let sm=0,sn=0,c=0,inb=0,cb=0;
-  for(let k=0;k<s.n;k++){const a=s.actual[k],p=q.q50[k],ne=s.neso[k],lo=q.q10[k],hi=q.q90[k];
+  // sidebar KPIs scored on the out-of-sample stretch only (stack was trained on the earlier span)
+  const s=HIST.series["12h"], q=s.models.stack, oi=oosStartIdx(s);let sm=0,sn=0,c=0,inb=0,cb=0;
+  for(let k=oi;k<s.n;k++){const a=s.actual[k],p=q.q50[k],ne=s.neso[k],lo=q.q10[k],hi=q.q90[k];
     if(a==null||p==null||ne==null||a<50)continue;sm+=Math.abs(a-p);sn+=Math.abs(a-ne);c++;
     if(lo!=null&&hi!=null){cb++;if(a>=lo&&a<=hi)inb++;}}
   $("k-skill").textContent=c?"+"+((1-sm/sn)*100).toFixed(0)+"%":"—";
