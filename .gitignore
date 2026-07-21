@@ -12,7 +12,6 @@ __pycache__/
 #temporary
 artifacts/
 docs/
-base/
 notebooks/
 test/
 data/
