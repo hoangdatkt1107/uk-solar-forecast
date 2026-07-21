@@ -16,7 +16,7 @@ concurrency:
 jobs:
   retrain:
     runs-on: ubuntu-latest
-    timeout-minutes: 180
+    timeout-minutes: 340       # bronze sync (~1.5 h) + CPU TCN training (~2 h) needs headroom
     steps:
       - uses: actions/checkout@v4
 
@@ -34,8 +34,9 @@ jobs:
         env:
           GRIDSIGHT_HF_TOKEN: ${{ secrets.GRIDSIGHT_HF_TOKEN }}
           GRIDSIGHT_BRONZE_HF_REPO: Masonhoang1107/gridsight-bronze
-          # pull the FULL history from HF (serve uses a 2-month window; training needs it all)
-          GRIDSIGHT_SYNC_MONTHS: "36"
+          # 24 months of history for training (was 36 — the extra year mostly cost sync time,
+          # ~2.3 h alone, and blew the runner's wall-clock limit; 2 yr still covers 2 full seasons)
+          GRIDSIGHT_SYNC_MONTHS: "24"
           # NESO stays full-archive (NESO_LEAN unset) — the per-file incremental build keeps it light
           # skip the flaky Met "overwrite last day" HDF5 pass; the gap-fill before it is enough
           GRIDSIGHT_MET_OVERWRITE: "0"
