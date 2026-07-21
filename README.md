@@ -3,7 +3,7 @@
 **Probabilistic solar generation forecasting for the GB national grid** — half-hourly,
 6–12 hours ahead, as a p10 / p50 / p90 range rather than a single number.
 
-**It cuts the grid operator's own forecast error roughly in half — and it is live.**
+**It cuts the grid operator's own forecast error by about a third on genuinely out-of-sample data — and it is live.**
 
 <p>
   <a href="https://orange-mushroom-083511803.7.azurestaticapps.net"><b>▶ Live dashboard</b></a>
@@ -23,21 +23,31 @@
 The benchmark is **NESO** — the National Energy System Operator's own embedded-solar
 forecast, i.e. the number GB's grid is actually balanced on. Beating it is the whole point.
 
-Two years of **out-of-sample** data (2024-07 → present, 35,728 half-hours), scored on
-**daylight slots only** (night is trivially zero and would flatter every model):
+Two years of backtest are on the dashboard, but the deployed model is **retrained weekly on a
+rolling split**, so most of that span is data it has already trained on. The honest test is the
+**genuinely out-of-sample** stretch — the months after the model's training cut-off (2026-01
+onward, ~4,800 daylight slots). Scored on **daylight slots only** (night is trivially zero and
+would flatter every model):
 
 | Horizon | GridSight MAE | NESO MAE | Skill (MAE reduction) | p10–p90 coverage |
 |---|---|---|---|---|
-| **6 h ahead** | **381 MW** | 874 MW | **−56.4 %** | 93.6 % |
-| **12 h ahead** | **393 MW** | 873 MW | **−55.0 %** | 93.6 % |
+| **6 h ahead** | **703 MW** | 1080 MW | **−34.9 %** | 80.4 % |
+| **12 h ahead** | **716 MW** | 1080 MW | **−33.7 %** | 80.5 % |
 
-- **Roughly half the operator's error**, and the margin holds across seasons — scrub the
-  timeline on the dashboard rather than taking one good week's word for it.
-- **The intervals are honest but conservative.** 93.6 % of actuals land inside a band that
-  is nominally sized for 80 %, so the model is under-confident: the range is wider than it
-  needs to be. Tightening that calibration is the top open item, not a solved problem.
-- **The foundation model lost.** A univariate zero-shot **Chronos** baseline reaches only
-  570–636 MW MAE — *worse than NESO*. Weather (NWP irradiance) and the physics of solar
+<sub>Over the full 2-year record the same model scores ~−55 % skill at ~93 % coverage — but that
+span is largely **in-sample** (the weekly-retrained model had already trained on it), so those
+headline-friendly figures are optimistic. The dashboard shades the in-sample region and reports
+the out-of-sample numbers instead; this README does the same. Getting a true 2-year out-of-sample
+curve would need a walk-forward backtest (each period predicted by a model trained only on prior
+data) — a known open item.</sub>
+
+- **About a third off the operator's error on unseen data**, and the margin holds across seasons
+  — scrub the timeline on the dashboard rather than taking one good week's word for it.
+- **The intervals are well-calibrated out-of-sample.** ~80 % of actuals land inside the
+  nominally-80 % p10–p90 band — close to target. (The wider ~93 % seen over the full record was
+  an in-sample artefact, not genuine conservatism.)
+- **The foundation model lost.** A univariate zero-shot **Chronos** baseline stays *worse than
+  NESO* (negative skill) even out-of-sample. Weather (NWP irradiance) and the physics of solar
   geometry carry this problem; a general-purpose time-series model that never sees the sky
   cannot compete. That negative result is kept in the repo and on the dashboard on purpose.
 
