@@ -1,0 +1,43 @@
+name: weekly-train
+
+# Stage 2 of the split weekly retrain (Sunday). Pulls the Gold that Saturday's `weekly-prep`
+# built and pushed to HF, then trains both horizons and promotes to HF — no bronze sync, no
+# rebuild. This keeps the training run well under GitHub's hard 6 h per-job cap even on the
+# full history at full epochs/folds. (`python pipeline.py retrain` still runs the whole thing
+# in one process for local/manual use.)
+
+on:
+  schedule:
+    - cron: "0 3 * * 0"        # Sundays 03:00 UTC (prep runs Saturdays 03:00)
+  workflow_dispatch: {}
+
+concurrency:
+  group: weekly-train
+  cancel-in-progress: false
+
+jobs:
+  train:
+    runs-on: ubuntu-latest
+    timeout-minutes: 330
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install deps (CPU torch + job requirements)
+        run: |
+          python -m pip install --upgrade pip
+          pip install --index-url https://download.pytorch.org/whl/cpu "torch==2.12.1"
+          pip install -r requirements-job.txt
+
+      - name: Pull prebuilt gold + train both horizons and push to HuggingFace
+        env:
+          GRIDSIGHT_HF_TOKEN: ${{ secrets.GRIDSIGHT_HF_TOKEN }}
+          # gold + model repos both derive from this (bronze -> gold / bronze -> model)
+          GRIDSIGHT_BRONZE_HF_REPO: Masonhoang1107/gridsight-bronze
+          GRIDSIGHT_FORCE_PROMOTE: "1"       # rolling split -> always ship the freshest model
+          KMP_DUPLICATE_LIB_OK: "TRUE"
+          OMP_NUM_THREADS: "2"
+        run: python pipeline.py train

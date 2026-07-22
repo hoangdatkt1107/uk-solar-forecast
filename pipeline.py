@@ -166,8 +166,53 @@ def retrain() -> None:
     logger.success("retrain complete")
 
 
+def _pull_gold() -> None:
+    """Download the pre-built Gold tables from HF (produced by `prep`) so `train` can skip the
+    ~2 h bronze sync + rebuild entirely. Set GRIDSIGHT_SKIP_HF_SYNC=1 to train on local gold."""
+    if _on("GRIDSIGHT_SKIP_HF_SYNC", "0"):
+        logger.info("train: GRIDSIGHT_SKIP_HF_SYNC set — using local gold")
+        return
+    from data_ingestion.gold.common import GOLD_LOCAL_DIR, GOLD_HF_REPO, hf_token
+    from huggingface_hub import snapshot_download
+    GOLD_LOCAL_DIR.mkdir(parents=True, exist_ok=True)
+    logger.info(f"train: pulling prebuilt gold from hf://datasets/{GOLD_HF_REPO}")
+    snapshot_download(repo_id=GOLD_HF_REPO, repo_type="dataset", token=hf_token,
+                      local_dir=str(GOLD_LOCAL_DIR), allow_patterns=["gold_features*/**"])
+
+
+def prep() -> None:
+    """Stage 1 of the split weekly retrain (Saturday): refresh bronze, build silver + gold and
+    push them to HF — NO training. The heavy ~2 h HF sync lives here so the Sunday train job
+    stays comfortably under the runner's 6 h cap even on the full history at full epochs."""
+    from data_ingestion.gold.build import run as gold_run
+    refresh_bronze()
+    push_bronze()
+    build_silver()
+    for h in _horizons():
+        logger.info(f"prep: building gold horizon={h} steps ({h // 2}h)")
+        gold_run(horizon=h)
+    push_silver_gold()
+    logger.success("prep complete (bronze + silver + gold refreshed & pushed)")
+
+
+def train() -> None:
+    """Stage 2 of the split weekly retrain (Sunday): pull the Gold that `prep` built and train
+    both horizons — no sync, no rebuild. Promote each model per push_model_if_better."""
+    import dataclasses
+    from modeling.config import ModelConfig
+    from modeling.train import run as train_run
+    from modeling.registry import push_model_if_better
+    _pull_gold()
+    for h in _horizons():
+        cfg = dataclasses.replace(ModelConfig(), horizon_step=h)
+        logger.info(f"train: horizon={h} steps ({h // 2}h)")
+        train_run(cfg)
+        push_model_if_better(cfg)
+    logger.success("train complete")
+
+
 _COMMANDS = {"serve": serve, "retrain": retrain, "refresh": refresh_bronze,
-             "silver": build_silver}
+             "silver": build_silver, "prep": prep, "train": train}
 
 
 def main() -> int:
