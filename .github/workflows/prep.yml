@@ -35,7 +35,11 @@ jobs:
         env:
           GRIDSIGHT_HF_TOKEN: ${{ secrets.GRIDSIGHT_HF_TOKEN }}
           GRIDSIGHT_BRONZE_HF_REPO: Masonhoang1107/gridsight-bronze
-          GRIDSIGHT_SYNC_MONTHS: "36"        # full 3-year history (the train job trains on this)
+          # 24 months, NOT more: Met Office NWP on AWS only goes back to 2024-07, so a wider
+          # window just adds rows with every weather feature NaN. Those still pass the
+          # has_full_history filter and the standardizer mean-imputes them, so they teach the
+          # TCN a fake "average weather" mapping. 36 months put 21.6% such rows in training.
+          GRIDSIGHT_SYNC_MONTHS: "24"
           GRIDSIGHT_MET_OVERWRITE: "0"
           GRIDSIGHT_PUSH_BRONZE: "1"
           GRIDSIGHT_PUSH_DERIVED: "1"        # push silver + gold so the train job can pull gold
