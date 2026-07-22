@@ -71,7 +71,21 @@ def prepare(cfg: ModelConfig) -> Dataset:
     if cfg.target not in df.columns:
         raise KeyError(f"Target {cfg.target} not in Gold")
     df = df[df["has_full_history"] == 1]
-    df = df[df[cfg.target].notna()].reset_index(drop=True) 
+    df = df[df[cfg.target].notna()]
+    # NWP is the model's main driver, but Gold still emits rows for periods the Met Office
+    # archive doesn't cover (AWS only serves a ~2-year rolling window, so anything before we
+    # started appending to bronze has no weather at all). Those rows keep has_full_history=1,
+    # and Standardizer.transform mean-imputes every weather column, which teaches the TCN a
+    # fake "average weather" mapping. Drop them here so training is correct no matter how wide
+    # the sync window is set.
+    if "ssrd_uk" in df.columns:
+        keep = df["ssrd_uk"].notna()
+        dropped = int((~keep).sum())
+        if dropped:
+            logger.warning(f"prepare: dropping {dropped:,}/{len(df):,} rows with no NWP "
+                           f"(ssrd_uk NaN) — outside the Met Office archive")
+        df = df[keep]
+    df = df.reset_index(drop=True)
     return Dataset(df=df, feature_columns=feature_columns(df), cfg=cfg)
 
 def make_sequences(value: np.ndarray, seq_len: int):

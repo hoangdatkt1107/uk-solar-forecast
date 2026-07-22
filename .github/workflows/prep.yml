@@ -35,11 +35,12 @@ jobs:
         env:
           GRIDSIGHT_HF_TOKEN: ${{ secrets.GRIDSIGHT_HF_TOKEN }}
           GRIDSIGHT_BRONZE_HF_REPO: Masonhoang1107/gridsight-bronze
-          # 24 months, NOT more: Met Office NWP on AWS only goes back to 2024-07, so a wider
-          # window just adds rows with every weather feature NaN. Those still pass the
-          # has_full_history filter and the standardizer mean-imputes them, so they teach the
-          # TCN a fake "average weather" mapping. 36 months put 21.6% such rows in training.
-          GRIDSIGHT_SYNC_MONTHS: "24"
+          # Pull the WHOLE accumulated bronze archive, not a fixed recent window. Met Office AWS
+          # only serves ~2 rolling years, which is exactly why we append every run to HF bronze —
+          # over time that archive grows past what AWS still has, and a hardcoded window would
+          # silently throw the extra history away. Rows outside the NWP coverage are dropped in
+          # modeling/data.py::prepare(), so a wide window is safe and training grows by itself.
+          GRIDSIGHT_SYNC_MONTHS: "60"
           GRIDSIGHT_MET_OVERWRITE: "0"
           GRIDSIGHT_PUSH_BRONZE: "1"
           GRIDSIGHT_PUSH_DERIVED: "1"        # push silver + gold so the train job can pull gold
