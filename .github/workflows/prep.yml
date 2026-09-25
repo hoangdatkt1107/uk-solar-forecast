@@ -8,7 +8,11 @@ name: weekly-prep
 on:
   schedule:
     - cron: "0 3 * * 6"        # Saturdays 03:00 UTC (train runs Sundays 03:00)
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      lookback_days:
+        description: "Days of Met Office NWP to gap-fill. 7 on the schedule; raise it once to backfill a longer gap."
+        default: "7"
 
 concurrency:
   group: weekly-prep
@@ -42,6 +46,7 @@ jobs:
           # modeling/data.py::prepare(), so a wide window is safe and training grows by itself.
           GRIDSIGHT_SYNC_MONTHS: "60"
           GRIDSIGHT_MET_OVERWRITE: "0"
+          GRIDSIGHT_BRONZE_LOOKBACK_DAYS: ${{ inputs.lookback_days || '7' }}   # schedule runs have no inputs
           GRIDSIGHT_PUSH_BRONZE: "1"
           GRIDSIGHT_PUSH_DERIVED: "1"        # push silver + gold so the train job can pull gold
           KMP_DUPLICATE_LIB_OK: "TRUE"

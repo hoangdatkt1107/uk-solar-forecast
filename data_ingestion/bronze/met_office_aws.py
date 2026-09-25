@@ -7,6 +7,7 @@ from __future__ import annotations
 import time
 import shutil
 import tempfile
+import threading
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -37,6 +38,19 @@ _CRS_CF = {
     "semi_major_axis": 6378137.0,
     "semi_minor_axis": 6356752.314140356,
 }
+
+# The netCDF4 manylinux wheel bundles an HDF5 built without thread safety (its
+# libsettings say "Threadsafety: no"; the macOS wheel says yes, which is why this never
+# reproduced locally). xarray holds its netCDF lock only while acquiring the file handle
+# and while reading array data, so the attribute and dimension reads open_dataset does
+# run unlocked. Two workers opening two files then sit inside HDF5 at once: "NetCDF:
+# Can't open HDF5 attribute", then SIGSEGV or a double free. That killed weekly-prep
+# every week from 2026-08-01. Downloads stay concurrent; everything that touches
+# netCDF/HDF5, open through close, runs under this one process-wide lock.
+_NC_LOCK = threading.Lock()
+
+# netCDF-4 files are HDF5 files; netCDF classic starts with CDF\x01 or CDF\x02
+_NC_MAGIC = (b"\x89HDF\r\n\x1a\n", b"CDF\x01", b"CDF\x02")
 
 _DEFAULT_POINTS = [
     ("South_East", 51.20, 0.50), ("London", 51.51, -0.13),
@@ -97,19 +111,40 @@ def _fetch(client, url: str, dst: Path) -> bool:
     return False
 
 
-def _extract_init(init: pd.Timestamp, points, cols, max_lead_h: int, overwrite: bool) -> str:
-    import httpx
+def _looks_like_netcdf(path: Path) -> bool:
+    """Check the magic bytes before a download ever reaches the C library."""
+    with open(path, "rb") as fh:
+        return fh.read(8).startswith(_NC_MAGIC)
+
+
+def _read_grid(dst: Path, points, idx):
+    """Open one .nc and return (grid index, 2-D field). The file is closed before the
+    lock is released, so no HDF5 handle outlives it or is closed later by the GC."""
     import xarray as xr
+    with _NC_LOCK, xr.open_dataset(dst) as ds:
+        if idx is None:
+            idx = _grid_index(ds, points)
+        main = next(v for v in ds.data_vars if {"projection_y_coordinate",
+                    "projection_x_coordinate"} <= set(ds[v].dims))
+        grid = np.asarray(ds[main].values)
+    return idx, grid
+
+
+def _extract_init(init: pd.Timestamp, points, cols, max_lead_h: int,
+                  overwrite: bool) -> tuple[str, int]:
+    """Returns (status, number of files that downloaded but could not be read)."""
+    import httpx
 
     out_path = (_ensure_partition_dir("met_office_nwp", init.year, init.month)
                 / f"nwp_{init:%Y%m%dT%H%M}Z.parquet")
     if not overwrite and out_path.exists() and out_path.stat().st_size > 256:
-        return "skip"
+        return "skip", 0
 
     tmp = Path(tempfile.mkdtemp(prefix="metaws_"))
     dst = tmp / "f.nc"
     idx = None
     rows = []
+    bad = 0
     try:
         with httpx.Client(headers={"User-Agent": "gridsight-bronze/1.0"}) as client:
             for lead in range(max_lead_h + 1):
@@ -120,16 +155,20 @@ def _extract_init(init: pd.Timestamp, points, cols, max_lead_h: int, overwrite: 
                            f"{valid:%Y%m%dT%H%M}Z-PT{lead:04d}H00M-{_VARMAP[col]}.nc")
                     if not _fetch(client, url, dst):
                         continue
-                    ds = xr.open_dataset(dst)
-                    if idx is None:
-                        idx = _grid_index(ds, points)
-                    main = next(v for v in ds.data_vars if {"projection_y_coordinate",
-                                "projection_x_coordinate"} <= set(ds[v].dims))
-                    grid = np.asarray(ds[main].values)
-                    ds.close()
+                    # one unreadable file costs one variable at one lead, like a 404,
+                    # rather than discarding the other files of the init
+                    try:
+                        if not _looks_like_netcdf(dst):
+                            raise ValueError("not a netCDF file")
+                        idx, grid = _read_grid(dst, points, idx)
+                    except Exception as e:
+                        bad += 1
+                        logger.warning(f"  {init:%Y%m%dT%H%M}Z +{lead}h {col}: unreadable ({e})")
+                        continue
+                    finally:
+                        dst.unlink(missing_ok=True)
                     for (region, _lat, _lon), (yi, xi) in zip(points, idx):
                         vals[region][col] = float(grid[yi, xi])
-                    dst.unlink(missing_ok=True)
 
                 now = datetime.now(timezone.utc).isoformat()
                 for region, lat, lon in points:
@@ -140,9 +179,9 @@ def _extract_init(init: pd.Timestamp, points, cols, max_lead_h: int, overwrite: 
                                  **{c: vals[region].get(c) for c in cols},
                                  "source": "aws_uk2km", "extracted_at": now})
         if not rows:
-            return "empty"
+            return "empty", bad
         pd.DataFrame(rows).to_parquet(out_path, index=False, compression="snappy")
-        return "done"
+        return "done", bad
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 
@@ -176,17 +215,18 @@ def ingest_met_office_aws(
                 f"inits={len(inits)} months={len(month_total)} step={init_step_h}h "
                 f"max_lead={max_lead_h}h vars={cols} points={len(points)} workers={workers}")
 
-    done = skipped = empty = failed = 0
+    done = skipped = empty = failed = bad_files = 0
     with ThreadPoolExecutor(max_workers=workers) as pool:
         futures = {pool.submit(_extract_init, i, points, cols, max_lead_h, overwrite): i
                    for i in inits}
         for n, fut in enumerate(as_completed(futures), 1):
             init = futures[fut]
             try:
-                st = fut.result()
+                st, bad = fut.result()
                 done += st == "done"
                 skipped += st == "skip"
                 empty += st == "empty"
+                bad_files += bad
             except Exception as e:
                 failed += 1
                 logger.error(f"  {init:%Y%m%dT%H%M}Z failed: {e}")
@@ -200,4 +240,5 @@ def ingest_met_office_aws(
                             f"empty={empty} fail={failed}")
 
     logger.success(f"Met Office AWS complete: done={done} skipped={skipped} empty={empty} "
-                   f"failed={failed} -> {BRONZE_LOCAL_DIR / 'met_office_nwp'}")
+                   f"failed={failed} unreadable_files={bad_files} "
+                   f"-> {BRONZE_LOCAL_DIR / 'met_office_nwp'}")
