@@ -1,13 +1,14 @@
 name: weekly-prep
 
 # Stage 1 of the split weekly retrain (Saturday). The heavy ~2 h bronze sync + gold rebuild
-# lives here and pushes fresh bronze/silver/gold to HF. The Sunday `weekly-train` job then just
-# pulls gold and trains — so neither job hits GitHub's hard 6 h per-job cap, and we can train on
-# the full history at full epochs/folds instead of trimming months to fit one combined run.
+# lives here and pushes fresh bronze/silver/gold to HF. `weekly-train` starts when this run
+# succeeds and just pulls gold and trains, so neither job hits GitHub's hard 6 h per-job cap,
+# and we can train on the full history at full epochs/folds instead of trimming months to fit
+# one combined run.
 
 on:
   schedule:
-    - cron: "0 3 * * 6"        # Saturdays 03:00 UTC (train runs Sundays 03:00)
+    - cron: "0 3 * * 6"        # Saturdays 03:00 UTC (train follows on success)
   workflow_dispatch:
     inputs:
       lookback_days:
