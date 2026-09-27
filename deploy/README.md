@@ -176,17 +176,21 @@ bronze repo: `…-bronze` → `…-model`), one folder per horizon:
 - **Serve** pulls the live model from HF at load time (`modeling/registry.py:pull_model_dir`),
   falling back to the image's baked-in model if HF is unset/unreachable
   (`GRIDSIGHT_MODEL_FROM_HF=0` forces baked-only).
-- **Retrain** runs weekly on **GitHub Actions** (`.github/workflows/retrain.yml`, Sundays
-  03:00 UTC + manual `workflow_dispatch`) — a free 16 GB runner, since training peaks
-  ~5.5 GiB. It pulls the full history from HF (`GRIDSIGHT_SYNC_MONTHS=36`), trains both
-  horizons on a **rolling val/test split**, and pushes the model to HF.
+- **Retrain** runs weekly on **GitHub Actions** as two jobs, on a free 16 GB runner since
+  training peaks ~5.5 GiB. `weekly-prep` (Saturdays 03:00 UTC) syncs the whole bronze
+  archive, rebuilds silver and gold and pushes them to HF. `weekly-train` starts when prep
+  finishes and runs only if prep succeeded; it pulls that gold, trains both horizons on a
+  **rolling val/test split** and hands each model to the promotion gate. Both also run from
+  `workflow_dispatch`; prep takes a `lookback_days` input to backfill an NWP gap.
 - **Rolling split** (`modeling/config.py`): by default `test` = the last `test_weeks` (8),
   `val` = the `val_weeks` before it, `train` = everything older (grows each week). Pin a
   fixed benchmark with `GRIDSIGHT_VAL_START` / `GRIDSIGHT_TEST_START`.
-- **Promotion**: because the rolling window slides, week-over-week test `mean_pinball`
-  isn't comparable, so the retrain sets `GRIDSIGHT_FORCE_PROMOTE=1` to always ship the
-  latest model (trained on the most data). For an ad-hoc retrain, leave it unset and
-  `push_model_if_better` keeps the lower-is-better gate.
+- **Promotion** (`modeling/registry.py`): the rolling window slides, so the stored test
+  `mean_pinball` of two different weeks isn't comparable. The gate downloads the live model
+  and scores it and the new one on the same rows of this run's test window, then promotes
+  unless the new model is more than `GRIDSIGHT_PROMOTE_TOLERANCE` worse (default 2%, so ties
+  go to the fresher model). A model that doesn't beat NESO on its own test window is never
+  promoted. `GRIDSIGHT_FORCE_PROMOTE=1` bypasses the gate for an ad-hoc run.
 
 Serve picks up the new model on its next hourly run — no image rebuild or redeploy needed.
 The **needed GitHub secret is `GRIDSIGHT_HF_TOKEN`** (HF token with write).

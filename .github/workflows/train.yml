@@ -1,14 +1,19 @@
 name: weekly-train
 
-# Stage 2 of the split weekly retrain (Sunday). Pulls the Gold that Saturday's `weekly-prep`
-# built and pushed to HF, then trains both horizons and promotes to HF — no bronze sync, no
-# rebuild. This keeps the training run well under GitHub's hard 6 h per-job cap even on the
-# full history at full epochs/folds. (`python pipeline.py retrain` still runs the whole thing
-# in one process for local/manual use.)
+# Stage 2 of the split weekly retrain. Pulls the Gold that `weekly-prep` built and pushed to
+# HF, then trains both horizons and promotes to HF; no bronze sync, no rebuild. This keeps
+# the training run well under GitHub's hard 6 h per-job cap even on the full history at full
+# epochs/folds. (`python pipeline.py retrain` still runs the whole thing in one process for
+# local/manual use.)
+#
+# Triggered by weekly-prep finishing, and only runs if it succeeded. It used to be a separate
+# Sunday cron: from 2026-08-01 prep crashed eight weeks running, train kept retraining on the
+# same frozen 2026-07-25 Gold and force-promoting it, and every run showed green.
 
 on:
-  schedule:
-    - cron: "0 3 * * 0"        # Sundays 03:00 UTC (prep runs Saturdays 03:00)
+  workflow_run:
+    workflows: ["weekly-prep"]
+    types: [completed]
   workflow_dispatch: {}
 
 concurrency:
@@ -17,6 +22,7 @@ concurrency:
 
 jobs:
   train:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 330
     steps:
@@ -37,7 +43,8 @@ jobs:
           GRIDSIGHT_HF_TOKEN: ${{ secrets.GRIDSIGHT_HF_TOKEN }}
           # gold + model repos both derive from this (bronze -> gold / bronze -> model)
           GRIDSIGHT_BRONZE_HF_REPO: Masonhoang1107/gridsight-bronze
-          GRIDSIGHT_FORCE_PROMOTE: "1"       # rolling split -> always ship the freshest model
+          # promotion scores the new and the live model on the same test window
+          # (modeling/registry.py); no force-promote on the schedule
           KMP_DUPLICATE_LIB_OK: "TRUE"
           OMP_NUM_THREADS: "2"
         run: python pipeline.py train
