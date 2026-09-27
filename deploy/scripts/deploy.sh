@@ -11,6 +11,9 @@ cd "$REPO_ROOT"
 
 # shellcheck disable=SC1091
 source "$SCRIPT_DIR/config.env"
+# Resources can live in a subscription that is not the az default, and the az calls
+# below use the default, so switch first. az keeps this as the default afterwards.
+if [ -n "${SUBSCRIPTION:-}" ]; then az account set --subscription "$SUBSCRIPTION"; fi
 
 : "${GRIDSIGHT_HF_TOKEN:?set GRIDSIGHT_HF_TOKEN in your shell (export GRIDSIGHT_HF_TOKEN=hf_...)}"
 : "${GRIDSIGHT_BRONZE_HF_REPO:?set GRIDSIGHT_BRONZE_HF_REPO in config.env}"

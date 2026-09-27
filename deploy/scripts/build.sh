@@ -6,6 +6,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 cd "$REPO_ROOT"
 source "$SCRIPT_DIR/config.env"
+# Resources can live in a subscription that is not the az default, and the az calls
+# below use the default, so switch first. az keeps this as the default afterwards.
+if [ -n "${SUBSCRIPTION:-}" ]; then az account set --subscription "$SUBSCRIPTION"; fi
 
 ACR_LOGIN="$(az acr show -n "$ACR" -g "$RG" --query loginServer -o tsv)"
 

@@ -15,6 +15,9 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 cd "$REPO_ROOT"
 # shellcheck disable=SC1091
 source "$SCRIPT_DIR/config.env"
+# Resources can live in a subscription that is not the az default, and the az calls
+# below use the default, so switch first. az keeps this as the default afterwards.
+if [ -n "${SUBSCRIPTION:-}" ]; then az account set --subscription "$SUBSCRIPTION"; fi
 
 [ -f frontend/history.json ] || { echo "frontend/history.json missing — run: env/bin/python frontend/build_history.py"; exit 1; }
 
