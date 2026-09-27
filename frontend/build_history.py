@@ -9,6 +9,10 @@ integer-rounded, weather stored display-ready, to keep the file small.
 
     KMP_DUPLICATE_LIB_OK=TRUE python frontend/build_history.py   # writes frontend/history.json
 
+It draws the stack with whatever is in artifacts/model_{12h,6h}. The dashboard's in-sample
+boundary (OOS_START in index.html) belongs to the model that drew it, 2026-07-15's: rebuild
+with another model and that boundary, and every "out-of-sample" number, has to move too.
+
 The KMP_DUPLICATE_LIB_OK=TRUE guard avoids an OpenMP double-load segfault when the
 LightGBM (stack) and Chronos torch runtimes coexist in one process. Chronos runs on CPU
 for the same reason. Takes ~8 min (stack + chronos, both horizons).

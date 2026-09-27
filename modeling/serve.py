@@ -27,12 +27,17 @@ _WEATHER = {"ssrd_uk": "ssrd", "tcc_uk": "tcc", "lcc_uk": "lcc",
 _OUT_DIR = Path(os.getenv("GRIDSIGHT_SERVE_DIR", "artifacts/serve"))
 _CHRONOS_MODEL = os.getenv("GRIDSIGHT_CHRONOS_MODEL", "amazon/chronos-bolt-base")
 _CHRONOS_CTX = 512
-# How much recent past to publish alongside the forecast (see _emit). Must stay inside the
-# serve job's bronze window (GRIDSIGHT_SYNC_MONTHS), and small enough to keep the JSON tiny.
+# How much recent past each run recomputes and publishes alongside the forecast (see _emit).
+# Must stay inside the serve job's bronze window (GRIDSIGHT_SYNC_MONTHS).
 try:
     _RECENT_DAYS = int(os.getenv("GRIDSIGHT_RECENT_DAYS", "14"))
 except ValueError:
     _RECENT_DAYS = 14
+# How long the stack's recent file keeps slots that have left that window (see _emit).
+try:
+    _KEEP_DAYS = int(os.getenv("GRIDSIGHT_RECENT_KEEP_DAYS", "365"))
+except ValueError:
+    _KEEP_DAYS = 365
 
 
 def _build(cfg: ModelConfig, hours_ahead: int | None, now: str | None):
@@ -62,8 +67,32 @@ def _records(frame: pd.DataFrame) -> list[dict]:
     return recs
 
 
+def _write_json(path: Path, payload: dict, indent: int | None = None) -> None:
+    """Write via a temp file and rename, so the API never reads a half-written file off
+    the shared mount."""
+    tmp = path.with_name(path.name + ".tmp")
+    tmp.write_text(json.dumps(payload, indent=indent))
+    os.replace(tmp, path)
+
+
+def _carry_over(path: Path, p_recs: list[dict], now: pd.Timestamp, keep_days: int) -> list[dict]:
+    """Slots from the previous run's file that are older than this run's window and newer
+    than keep_days, followed by p_recs. Slots this run recomputed come from p_recs."""
+    if keep_days <= 0 or not path.exists():
+        return p_recs
+    try:
+        old = json.loads(path.read_text()).get("recent") or []
+    except (OSError, ValueError) as e:
+        logger.warning(f"serve: could not read {path.name} to carry it over ({e})")
+        return p_recs
+    first = pd.Timestamp(p_recs[0]["timestamp_utc"]) if p_recs else now
+    floor = now - pd.Timedelta(days=keep_days)
+    kept = [r for r in old if floor <= pd.Timestamp(r["timestamp_utc"]) < first]
+    return kept + p_recs
+
+
 def _emit(gold: pd.DataFrame, preds: pd.DataFrame, now: pd.Timestamp,
-          hours_ahead: int, model_tag: str) -> pd.DataFrame:
+          hours_ahead: int, model_tag: str, keep_days: int = 0) -> pd.DataFrame:
     """Merge weather/NESO/actual context onto preds, then write two JSONs: the future
     slots (the forecast) and a recent past window.
 
@@ -73,6 +102,10 @@ def _emit(gold: pd.DataFrame, preds: pd.DataFrame, now: pd.Timestamp,
     over the whole gold table, so the recent past (actual + NESO + what the model said) is
     sitting in memory here; writing it out costs nothing and lets the dashboard keep its
     actual line current between history rebuilds.
+
+    With keep_days > 0 the recent file also carries over the slots that have left this
+    run's window, up to keep_days old, so the dashboard has no gap however long ago
+    history.json was rebuilt. Those slots keep what the model live at the time said.
     """
     preds[TS] = pd.to_datetime(preds[TS], utc=True)
     keep = [TS, "target_mw", "nwp_age_h", "embedded_solar_mw", *_WEATHER]
@@ -92,7 +125,7 @@ def _emit(gold: pd.DataFrame, preds: pd.DataFrame, now: pd.Timestamp,
     fut.to_parquet(_OUT_DIR / f"forecast_{model_tag}_{tag}.parquet", index=False)
     payload = {"generated_at": now.isoformat(), "horizon_h": hours_ahead,
                "model": model_tag, "n_points": len(recs), "forecast": recs}
-    (_OUT_DIR / f"forecast_{model_tag}_{tag}.json").write_text(json.dumps(payload, indent=2))
+    _write_json(_OUT_DIR / f"forecast_{model_tag}_{tag}.json", payload, indent=2)
     logger.success(f"serve[{model_tag}]: wrote {len(recs)} points -> "
                    f"{_OUT_DIR}/forecast_{model_tag}_{tag}.json")
 
@@ -100,15 +133,16 @@ def _emit(gold: pd.DataFrame, preds: pd.DataFrame, now: pd.Timestamp,
     days = _RECENT_DAYS
     past = (df[(df[TS] < now) & (df[TS] >= now - pd.Timedelta(days=days))]
             .sort_values(TS).reset_index(drop=True))
-    p_recs = _records(past)
+    r_path = _OUT_DIR / f"recent_{model_tag}_{tag}.json"
+    p_recs = _carry_over(r_path, _records(past), now, keep_days)
     n_act = sum(1 for r in p_recs if r["actual"] is not None)
     r_payload = {"generated_at": now.isoformat(), "horizon_h": hours_ahead,
-                 "model": model_tag, "days": days, "n_points": len(p_recs),
-                 "n_actual": n_act, "recent": p_recs}
-    (_OUT_DIR / f"recent_{model_tag}_{tag}.json").write_text(json.dumps(r_payload, indent=2))
+                 "model": model_tag, "days": days, "keep_days": keep_days,
+                 "n_points": len(p_recs), "n_actual": n_act, "recent": p_recs}
+    _write_json(r_path, r_payload)                   # compact: up to a year of slots
     logger.success(f"serve[{model_tag}]: wrote {len(p_recs)} recent points "
-                   f"({n_act} with actual, last {days}d) -> "
-                   f"{_OUT_DIR}/recent_{model_tag}_{tag}.json")
+                   f"({n_act} with actual, recomputed last {days}d, kept up to "
+                   f"{keep_days}d) -> {r_path}")
     return fut
 
 
@@ -160,7 +194,10 @@ def serve_all(cfg: ModelConfig = ModelConfig(), hours_ahead: int | None = None,
         return {}
     out = {}
     if "stack" in models:
-        out["stack"] = _emit(gold, predict_gold(gold, cfg.artifacts_dir), now, hours_ahead, "stack")
+        out["stack"] = _emit(gold, predict_gold(gold, cfg.artifacts_dir), now, hours_ahead,
+                             "stack", keep_days=_KEEP_DAYS)
+    # chronos is not carried over: its past slots are the few between the last observed
+    # actual and now, forecast at a much shorter lead than the stack's, and never get an actual
     if "chronos" in models:
         try:
             out["chronos"] = _emit(gold, _chronos_forward(gold, now, hours_ahead), now, hours_ahead, "chronos")

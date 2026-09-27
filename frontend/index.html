@@ -428,6 +428,7 @@ let HIST=null, S=null, Q=null, curH="12h", curModel="stack";
 let winPts=336, i0=0, sel=-1, R=[], TREND=null, yMax=16000, START=0, STEP=1800000;
 let oosI=-1;   // series index where out-of-sample begins for the current model (-1 = n/a)
 let dragging=false, dragX=0, dragI0=0, didDrag=false;
+let follow=true;   // view pinned to the latest data; dragging, panning or jumping unpins it
 
 const tsAt=i=>new Date(START + i*STEP);
 
@@ -478,7 +479,8 @@ function build(){
   TREND=null;
   if(winPts>=1000){
     const W=clamp(Math.round(R.length/14),5,90);
-    TREND=R.map((_,k)=>{let s=0,c=0;
+    TREND=R.map((d,k)=>{if(d.actual==null)return null;   // no trend drawn across a data gap
+      let s=0,c=0;
       for(let j=Math.max(0,k-W);j<=Math.min(R.length-1,k+W);j++){const v=R[j].actual;if(v!=null){s+=v;c++;}}
       return c?s/c:null;});
   }
@@ -554,10 +556,17 @@ function draw(){
     s.appendChild(el("rect",{class:"live-bg",x:x,y:P.mt,width:Math.max(0,(P.w-P.mr)-x),height:P.h-P.mt-P.mb}));
     s.appendChild(el("line",{class:"now-line",x1:x,x2:x,y1:P.mt,y2:P.h-P.mb}));
   }
-  // p10–p90 band
-  let up="",dn="";R.forEach((d,k)=>{if(d.q90!=null)up+=(up?"L":"M")+xAt(k).toFixed(1)+" "+yAt(d.q90).toFixed(1)+" ";});
-  for(let k=R.length-1;k>=0;k--){if(R[k].q10!=null)dn+="L"+xAt(k).toFixed(1)+" "+yAt(R[k].q10).toFixed(1)+" ";}
-  if(up)s.appendChild(el("path",{class:"band",d:up+dn+"Z"}));
+  // p10–p90 band, one polygon per unbroken run so it never bridges a data gap
+  let band="";
+  for(let a=0;a<R.length;){
+    if(R[a].q10==null||R[a].q90==null){a++;continue;}
+    let b=a; while(b+1<R.length&&R[b+1].q10!=null&&R[b+1].q90!=null)b++;
+    let up="",dn="";
+    for(let k=a;k<=b;k++)up+=(k===a?"M":"L")+xAt(k).toFixed(1)+" "+yAt(R[k].q90).toFixed(1)+" ";
+    for(let k=b;k>=a;k--)dn+="L"+xAt(k).toFixed(1)+" "+yAt(R[k].q10).toFixed(1)+" ";
+    band+=up+dn+"Z "; a=b+1;
+  }
+  if(band)s.appendChild(el("path",{class:"band",d:band}));
   // lines: NESO, actual, forecast
   s.appendChild(el("path",{class:"neso",d:linePath(d=>d.neso)}));
   s.appendChild(el("path",{class:"actual",d:linePath(d=>d.actual)}));
@@ -577,6 +586,10 @@ function draw(){
   if(S&&S.liveFrom!=null&&S.liveFrom>=i0&&S.liveFrom<i0+winPts){
     let k=R.findIndex(d=>d.i>=S.liveFrom); if(k<0)k=R.length-1; const x=k<=0?P.ml:xAt(k);
     const t=el("text",{class:"livetag",x:Math.min(x+5,P.w-P.mr-62),y:P.mt+11}); t.textContent="FORECAST"; s.appendChild(t);}
+  // live data still on its way (the API scales to zero, so the first call can take a while)
+  if(Q&&Q._pending&&S.histN<i0+winPts){
+    const t=el("text",{class:"livetag",x:P.w-P.mr-6,y:P.mt+11,"text-anchor":"end"});
+    t.textContent="LOADING LIVE DATA…"; s.appendChild(t);}
   // selection crosshair + dots + in-chart value box
   if(sel>=0){const k=R.reduce((best,d,idx)=>Math.abs(d.i-sel)<Math.abs(R[best].i-sel)?idx:best,0);
     const d=R[k],x=xAt(k);
@@ -673,7 +686,7 @@ function bindPlot(){
     if(dragging){const r=s.getBoundingClientRect();
       const dpx=(e.clientX-dragX)/r.width*P.w;
       const dIdx=Math.round(-dpx/(P.w-P.ml-P.mr)*(R.length-1||1)*Math.max(1,Math.ceil(winPts/700)));
-      if(Math.abs(e.clientX-dragX)>3)didDrag=true;
+      if(Math.abs(e.clientX-dragX)>3){didDrag=true;follow=false;}
       i0=clamp(dragI0+dIdx,0,S.n-winPts);build();
     } else {sel=pxToIndex(e.clientX);draw();updateReadout();}
   });
@@ -685,14 +698,14 @@ function bindPlot(){
     else if(e.key==="ArrowLeft"){pan(-step);e.preventDefault();}
   });
 }
-function pan(delta){i0=clamp(i0+delta,0,S.n-winPts);sel=-1;build();}
+function pan(delta){follow=false;i0=clamp(i0+delta,0,S.n-winPts);sel=-1;build();}
 
 // click anywhere on any window → zoom into the 24 h window for that calendar day, with the
 // clicked half-hour kept selected so the readout lands on it.
 function jumpToDay(idx){
   if(idx<0||!S)return;
   const d=tsAt(idx), dayStart=Date.UTC(d.getUTCFullYear(),d.getUTCMonth(),d.getUTCDate());
-  winPts=clamp(48,24,S.n);
+  follow=false; winPts=clamp(48,24,S.n);
   i0=clamp(Math.round((dayStart-START)/STEP),0,S.n-winPts);
   sel=idx; mark(); build();
 }
@@ -707,10 +720,12 @@ function mark(){
 // history.json is a static 2-year backtest: it only moves when it is rebuilt by hand, so
 // its `actual` freezes at the last rebuild and drifts further behind every hour. The hourly
 // serve job publishes two windows that close that gap:
-//   /recent   — last N days of actual + NESO + what the model said  -> fills history..now
-//   /forecast — the next horizon                                    -> the LIVE region
+//   /recent:   actual + NESO + what the live model said, kept for up to a year, asked for
+//              from the end of history.json on                        -> fills history..now
+//   /forecast: the next horizon                                       -> the LIVE region
+// Slots nobody has data for stay null (day too, so they are not shaded as night).
 function _grow(s,N){const g=(a,f)=>{while(a.length<N)a.push(f);};
-  g(s.actual,null);g(s.neso,null);g(s.ssrd,null);g(s.cloud,null);g(s.temp,null);g(s.wind,null);g(s.day,0);
+  g(s.actual,null);g(s.neso,null);g(s.ssrd,null);g(s.cloud,null);g(s.temp,null);g(s.wind,null);g(s.day,null);
   for(const m in s.models){g(s.models[m].q10,null);g(s.models[m].q50,null);g(s.models[m].q90,null);}
   s.n=N;}
 
@@ -721,8 +736,8 @@ async function _get(url){
   catch(_){return null;}
 }
 
-// Merge API records in at their true index. Only touches i >= fromIdx, so the backtest
-// already in history.json is never overwritten. Returns the highest index seen.
+// Merge API records in at their true index. Only touches i >= fromIdx (the end of
+// history.json), so the backtest is never overwritten. Returns the highest index seen.
 function _mergeRecs(s,q,recs,fromIdx){
   let maxI=-1;
   recs.forEach(r=>{const i=_idx(s,r.timestamp_utc); if(i>maxI)maxI=i;});
@@ -742,28 +757,44 @@ function _mergeRecs(s,q,recs,fromIdx){
   return maxI;
 }
 
+function _applyLive(s,q,rec,fc,from){
+  // 1) close the gap between the end of the static history and now, with real actuals
+  if(rec&&rec.recent&&rec.recent.length) _mergeRecs(s,q,rec.recent,from);
+  // 2) append the forecast. The LIVE band starts where the forecast starts — not where
+  //    history ended — because everything before that is observed, not predicted.
+  if(fc&&fc.forecast&&fc.forecast.length&&_mergeRecs(s,q,fc.forecast,from)>=from){
+    const li=_idx(s,fc.generated_at);
+    s.liveFrom=(li>from)?li:from;
+  }
+}
+
+// The last live answer is kept in this browser and drawn at once on the next visit, while the
+// API (scaled to zero) wakes up; the loading tag stays until the fresh answer replaces it.
+// Keyed on where history.json ends, so a rebuilt history ignores the old copy.
+function _cacheGet(k){try{return JSON.parse(localStorage.getItem(k)||"null");}catch(_){return null;}}
+function _cacheSet(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(_){}}
+
+// Applies the cached copy before its first await, so a caller that builds right after calling
+// it already draws that copy. Resolves true when the chart should be redrawn (fresh data
+// arrived, or the loading tag must go).
 async function ensureLive(hz,model){
   if(!API_BASE) return false;
   const s=HIST.series[hz], q=s.models[model];
-  if(q._live) return false;                                // one attempt per model/horizon
-  const oldN=s.n;
+  if(q._live||q._pending) return false;                    // one request per model/horizon
+  q._pending=true;
+  const from=s.histN, since=new Date(Date.parse(s.start)+from*s.step_min*60000).toISOString();
+  const key=`gridsight.live.${model}.${hz}`, cached=_cacheGet(key);
+  if(cached&&cached.since===since) _applyLive(s,q,cached.rec,cached.fc,from);
   const [rec,fc]=await Promise.all([
-    _get(`${API_BASE}/recent?model=${model}&horizon=${hz}`),
+    _get(`${API_BASE}/recent?model=${model}&horizon=${hz}&since=${encodeURIComponent(since)}`),
     _get(`${API_BASE}/forecast?model=${model}&horizon=${hz}`),
   ]);
-  if(!rec&&!fc) return false;                              // API unreachable — allow a retry
+  q._pending=false;
+  if(!rec&&!fc) return true;                               // API unreachable: allow a retry
   q._live=true;
-  let changed=false;
-  // 1) close the gap between the end of the static history and now, with real actuals
-  if(rec&&rec.recent&&rec.recent.length&&_mergeRecs(s,q,rec.recent,oldN)>=oldN) changed=true;
-  // 2) append the forecast. The LIVE band starts where the forecast starts — not where
-  //    history ended — because everything before that is observed, not predicted.
-  if(fc&&fc.forecast&&fc.forecast.length&&_mergeRecs(s,q,fc.forecast,oldN)>=oldN){
-    changed=true;
-    const li=_idx(s,fc.generated_at);
-    s.liveFrom=(li>oldN)?li:oldN;
-  }
-  return changed;
+  _applyLive(s,q,rec,fc,from);
+  _cacheSet(key,{since,rec,fc});
+  return true;
 }
 
 // ---- boot ---------------------------------------------------------------------
@@ -771,21 +802,24 @@ function applyView(resetPan){
   S=HIST.series[curH]; Q=S.models[curModel];
   START=Date.parse(S.start); STEP=S.step_min*60000;
   oosI = curModel==="stack" ? oosStartIdx(S) : -1;   // chronos is zero-shot → no in-sample region
+  const live=ensureLive(curH,curModel);              // may grow S from the cached copy first
   winPts=clamp(winPts,24,S.n);
-  if(resetPan) i0=S.n-winPts;
+  if(resetPan) follow=true;
+  if(follow) i0=S.n-winPts;
   i0=clamp(i0,0,S.n-winPts); sel=-1;
   const name=curModel==="stack"?"Stack LGBM+TCN":"Chronos-bolt";
   $("sub-model").textContent=name+" · "+curH+" ahead";
   $("r-model").textContent=curModel;
   build();
-  // fetch live forecast (if API configured) and redraw when it arrives
-  ensureLive(curH,curModel).then(changed=>{ if(changed){ if(resetPan) i0=S.n-winPts; build(); } });
+  // redraw when the live forecast (if API configured) arrives
+  live.then(changed=>{ if(changed){ if(follow) i0=S.n-winPts; build(); } });
 }
 
 // ===== performance view — everything computed client-side from history.json ==========
 let curView="explore";
-// history.json (generated 2026-07-15) was produced by the LIVE weekly-retrained stack model,
-// whose rolling split trains on all-but-the-recent-holdout. So most of the 2-year span is
+// history.json is drawn by the stack model trained on 2026-07-15 (live at the time) and is
+// only ever rebuilt with that same model, so the boundary below stays valid. Its rolling split
+// trains on all-but-the-recent-holdout. So most of the 2-year span is
 // in-sample for that model: skill AND p10–p90 coverage both step down sharply at 2026-01
 // (skill ~63%→~30%, coverage ~0.95→~0.80), marking where the data becomes genuinely
 // out-of-sample. That boundary is where we score the honest numbers. Chronos is zero-shot
@@ -814,7 +848,7 @@ function computePerf(hz,model){
   // heat + monthly span the full record so the trend chart can show the in→out-of-sample shift.
   const season=[acc(),acc(),acc(),acc()], sky={sun:acc(),mix:acc(),over:acc()};
   const oos=acc(), ins=acc();
-  for(let k=0;k<s.n;k++){
+  for(let k=0;k<s.histN;k++){                       // history.json only, not the live overlay
     const a=s.actual[k]; if(a==null||a<50)continue;
     const p=q.q50[k], ne=s.neso[k]; if(p==null||ne==null)continue;
     const lo=q.q10[k], hi=q.q90[k];
@@ -915,7 +949,7 @@ function renderCalib(M){
 }
 
 function oosRangeLabel(M){
-  const s=HIST.series[curH]; const endMs=Date.parse(s.start)+(s.n-1)*s.step_min*60000;
+  const s=HIST.series[curH]; const endMs=Date.parse(s.start)+(s.histN-1)*s.step_min*60000;
   const f=d=>MON[d.getUTCMonth()]+" "+String(d.getUTCFullYear()).slice(2);
   return M.hasIS ? f(new Date(M.oosStartMs))+"–"+f(new Date(endMs)) : "full record";
 }
@@ -987,13 +1021,13 @@ async function boot(){
   // controls
   $("seg-tf").addEventListener("click",e=>{const b=e.target.closest("[data-tf]");if(!b)return;
     const anchor=i0+Math.round(winPts/2);winPts=+b.dataset.tf;winPts=clamp(winPts,24,S.n);
-    i0=clamp(anchor-Math.round(winPts/2),0,S.n-winPts);mark();build();});
+    i0=follow?S.n-winPts:clamp(anchor-Math.round(winPts/2),0,S.n-winPts);mark();build();});
   $("seg-model").addEventListener("click",e=>{const b=e.target.closest("[data-model]");if(!b)return;
     curModel=b.dataset.model;mark();applyView(false);});
   $("seg-h").addEventListener("click",e=>{const b=e.target.closest("[data-h]");if(!b)return;
     curH=b.dataset.h;mark();applyView(false);});
   $("nav").addEventListener("click",e=>{const b=e.target.closest("[data-step]");if(!b)return;
-    if(b.dataset.step==="latest"){i0=S.n-winPts;sel=-1;build();}else pan(+b.dataset.step*Math.round(winPts/2));});
+    if(b.dataset.step==="latest"){follow=true;i0=S.n-winPts;sel=-1;build();}else pan(+b.dataset.step*Math.round(winPts/2));});
   $("side-tabs").addEventListener("click",e=>{const b=e.target.closest("[data-tab]");if(!b)return;
     document.querySelectorAll("#side-tabs button").forEach(x=>x.classList.toggle("on",x===b));
     $("tab-about").style.display=b.dataset.tab==="about"?"":"none";
@@ -1004,11 +1038,18 @@ async function boot(){
   $("pseg-h").addEventListener("click",e=>{const b=e.target.closest("[data-h]");if(!b)return;curH=b.dataset.h;mark();buildPerf();});
   bindPlot();
 
-  // data
+  // data. Start waking the API (it scales to zero) while history.json downloads.
+  if(API_BASE) fetch(`${API_BASE}/health`,{cache:"no-store"}).catch(()=>{});
   try{
     const r=await fetch("history.json",{cache:"no-store"});
     if(!r.ok)throw 0;
     HIST=await r.json();
+    // Extend every series to the current half-hour so the chart opens on today straight
+    // away; the slots after history.json fill in when the live API answers. histN keeps
+    // where history.json ends: the performance view scores that backtest only.
+    for(const k in HIST.series){const s=HIST.series[k]; s.histN=s.n;
+      const iNow=Math.floor((Date.now()-Date.parse(s.start))/(s.step_min*60000));
+      if(iNow+1>s.n)_grow(s,iNow+1);}
   }catch(_){
     $("plot").innerHTML='<text x="500" y="230" text-anchor="middle" fill="#7c838c" font-size="14">Serve over HTTP to load history.json — e.g. `python -m http.server`.</text>';
     return;
@@ -1019,13 +1060,13 @@ async function boot(){
   fitChart(); build();
   $("viewbar-note").textContent="Live next-12 h forecast + 2-year backtest — drag to scrub, click a day to zoom to 24 h.";
   let rz; addEventListener("resize",()=>{clearTimeout(rz);rz=setTimeout(()=>{if(curView==="explore"){fitChart();if(S)build();}},150);});
-  $("d-gen").textContent="Generated "+(HIST.generated_at||"").slice(0,10)+" · "+S.n.toLocaleString()+" half-hours × 2 horizons × 2 models";
+  $("d-gen").textContent="Generated "+(HIST.generated_at||"").slice(0,10)+" · "+S.histN.toLocaleString()+" half-hours × 2 horizons × 2 models";
 }
 
 function fullStats(){
   // sidebar KPIs scored on the out-of-sample stretch only (stack was trained on the earlier span)
   const s=HIST.series["12h"], q=s.models.stack, oi=oosStartIdx(s);let sm=0,sn=0,c=0,inb=0,cb=0;
-  for(let k=oi;k<s.n;k++){const a=s.actual[k],p=q.q50[k],ne=s.neso[k],lo=q.q10[k],hi=q.q90[k];
+  for(let k=oi;k<s.histN;k++){const a=s.actual[k],p=q.q50[k],ne=s.neso[k],lo=q.q10[k],hi=q.q90[k];
     if(a==null||p==null||ne==null||a<50)continue;sm+=Math.abs(a-p);sn+=Math.abs(a-ne);c++;
     if(lo!=null&&hi!=null){cb++;if(a>=lo&&a<=hi)inb++;}}
   $("k-skill").textContent=c?"+"+((1-sm/sn)*100).toFixed(0)+"%":"—";
